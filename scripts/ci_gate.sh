@@ -70,7 +70,8 @@ shell_syntax() {
 }
 
 compose_config() {
-  ORBIT_HOME=/tmp ORBIT_IMAGE_TAG=gate ORBIT_PG_PASSWORD=gate docker compose -f compose.yaml config -q
+  mkdir -p "$ROOT/home/env" && : > "$ROOT/home/env/orbit.env" || return 1
+  ORBIT_HOME="$ROOT/home" ORBIT_IMAGE_TAG=gate ORBIT_PG_PASSWORD=gate docker compose -f compose.yaml config -q
 }
 
 echo "ci_gate: $SHA"
