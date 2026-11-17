@@ -24,7 +24,7 @@ Slack DM <──(Bot 토큰, Socket Mode)── QM core (Codex 구독) ──> q
 | `orbit-collector` | 채널 발견, 수집, 대조, 보존 삭제 | Slack User 토큰 |
 | `orbit-api` | 분류, MCP 도구, 라우터, 긴급 알림 | API 토큰, webhook 서명 키, OpenRouter 키(선택) |
 | `orbit-pg` | 원문과 업무 지식 | |
-| `orbit-runner` | GitHub Actions CI | 없음. 호스트 폴더와 docker.sock 을 마운트하지 않는다 |
+| `orbit-runner` | GitHub Actions CI | 없음. 호스트 폴더와 docker.sock 을 마운트하지 않는다. 공개 저장소라 PR 생성은 Collaborators only, 포크 PR 실행은 승인 필수로 둔다 |
 
 Orbit 컨테이너와 QM 컨테이너는 Docker 네트워크 `qm-orbit`에서 만난다. `orbit-pg`는 그 네트워크에 붙지 않는다. Orbit은 호스트 포트를 열지 않는다.
 
