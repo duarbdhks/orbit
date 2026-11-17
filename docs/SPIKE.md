@@ -12,7 +12,7 @@ QM `@yc-software/qm@0.1.18`, core 이미지 `sha256:988ce509…`(amd64), 2026-11
 | 3b | Colima 격리 | 실행 안 함 | 3a의 턴 검증이 실패하면 진행한다 |
 | 4 | 포트 노출 | 열려 있음 (측정) | API 포트 18080이 `0.0.0.0`에 묶여 LAN IP로 200이 나온다. 인증 없는 `/v1/models`는 401. 웹 18082는 `127.0.0.1`만. macOS 방화벽은 꺼져 있다 |
 | 5 | Slack 조회 | 미검증 | 수집용 토큰이 없다. `scripts/probe/slack.sh`를 준비했다 |
-| 6 | 사설 MCP와 대상 제한 | 일부 통과 | `scripts/qm_register.sh`로 `attestActor` 등록 성공, QM이 카탈로그 도구 `orbit`를 보고한다 (측정). core 컨테이너에서 Orbit API로의 경로는 `scripts/probe/qm_reach.sh`로 확인한다. 턴 안에서의 호출과 채널 멘션에서의 미제공은 미검증 |
+| 6 | 사설 MCP와 대상 제한 | 일부 통과 | `scripts/qm_register.sh`로 `attestActor` 등록 성공, QM이 카탈로그 도구 `orbit`를 보고한다 (측정). core 컨테이너 안에서 Orbit API를 부르면 토큰 없음 401, 도구 목록 200에 8개, actor 없는 호출 401이다 (`scripts/probe/qm_reach.sh`, 측정). QM의 MCP 클라이언트가 턴 안에서 부르는 것과 채널 멘션에서의 미제공은 미검증 |
 | 7 | decision rule | 미검증 | 규칙 등록과 호출은 모델이 연결된 뒤 확인한다. Orbit 쪽 `/decisions`는 테스트로 검증했다 |
 | 8 | cron과 webhook | 미검증 | QM이 턴 안에서 만든다 |
 
