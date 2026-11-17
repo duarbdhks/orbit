@@ -1,0 +1,106 @@
+[
+  {
+    "input": "결제 서버 장애 발생, 주문이 전부 실패하고 있습니다",
+    "expected": "notify_now"
+  },
+  {
+    "input": "긴급: 운영 DB가 다운됐습니다. 확인 부탁드립니다",
+    "expected": "notify_now"
+  },
+  {
+    "input": "로그인이 안 됩니다. 핫픽스 배포가 필요합니다",
+    "expected": "notify_now"
+  },
+  {
+    "input": "sev1 incident: API 5xx 비율이 급증하고 있습니다",
+    "expected": "notify_now"
+  },
+  {
+    "input": "배포 후 오류율이 올라 롤백을 진행합니다",
+    "expected": "notify_now"
+  },
+  {
+    "input": "prod outage 확인했습니다. 원인 파악 중입니다",
+    "expected": "notify_now"
+  },
+  {
+    "input": "다음 주 릴리스 일정은 목요일로 확정했습니다",
+    "expected": "briefing"
+  },
+  {
+    "input": "검색 API는 v2 구조로 가기로 결정했습니다",
+    "expected": "briefing"
+  },
+  {
+    "input": "배포 일정이 금요일에서 다음 주 월요일로 연기됐습니다",
+    "expected": "briefing"
+  },
+  {
+    "input": "환불 정책을 변경합니다. 기한을 7일에서 14일로 늘립니다",
+    "expected": "briefing"
+  },
+  {
+    "input": "QA 인력이 부족해서 이번 스프린트 일정에 리스크가 있습니다",
+    "expected": "briefing"
+  },
+  {
+    "input": "이번 분기 마감은 이달 말일입니다",
+    "expected": "briefing"
+  },
+  {
+    "input": "디자인 시안이 승인됐습니다. 구현을 시작합니다",
+    "expected": "briefing"
+  },
+  {
+    "input": "인증 모듈 리팩터링은 취소하기로 합의했습니다",
+    "expected": "briefing"
+  },
+  {
+    "input": "외부 API 계약이 지연되면 출시가 차단될 위험이 있습니다",
+    "expected": "briefing"
+  },
+  {
+    "input": "신규 온보딩 화면 릴리스는 2주 뒤로 잡았습니다",
+    "expected": "briefing"
+  },
+  {
+    "input": "안녕하세요",
+    "expected": "hold"
+  },
+  {
+    "input": "ㅋㅋㅋㅋ",
+    "expected": "hold"
+  },
+  {
+    "input": "점심 뭐 드실래요?",
+    "expected": "hold"
+  },
+  {
+    "input": "👍",
+    "expected": "hold"
+  },
+  {
+    "input": "감사합니다!",
+    "expected": "hold"
+  },
+  {
+    "input": "수고하셨습니다",
+    "expected": "hold"
+  },
+  {
+    "input": "넵",
+    "expected": "hold"
+  },
+  {
+    "input": "오늘 날씨 좋네요",
+    "expected": "hold"
+  },
+  {
+    "input": "회의실 예약해 두었습니다",
+    "expected": "hold"
+  },
+  {
+    "input": "자료 공유드립니다. 편하실 때 봐 주세요",
+    "expected": "hold"
+  }
+]
