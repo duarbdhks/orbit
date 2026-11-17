@@ -56,10 +56,7 @@ const output = (value) => process.stdout.write(String(value) + "\n");
 const idle = () => assert.notEqual(s.runner?.busy, true, "busy runner must not change");
 s.calls.push({ cli, args, tokenEnv: process.env.RUNNER_TOKEN });
 try {
-  if (cli === "git") {
-    assert.deepEqual(args, ["-C", process.env.MOCK_ROOT, "remote", "get-url", "origin"]);
-    output("https://github.com/example/orbit.git");
-  } else if (cli === "gh") {
+  if (cli === "gh") {
     assert.equal(args[0], "api");
     const endpoint = args.find((a) => a.startsWith("repos/"));
     if (endpoint === "repos/example/orbit") output(s.private);
@@ -193,7 +190,7 @@ function fixture(t: { after: (fn: () => void) => void }, overrides: Partial<Mock
       ...overrides,
     }),
   );
-  for (const cli of ["docker", "gh", "git"])
+  for (const cli of ["docker", "gh"])
     writeFileSync(join(bin, cli), `#!${process.execPath}\n${mockCli}`, { mode: 0o755 });
   const read = (): MockState => JSON.parse(readFileSync(file, "utf8"));
   return {
@@ -206,7 +203,13 @@ function fixture(t: { after: (fn: () => void) => void }, overrides: Partial<Mock
         cwd: tmpdir(),
         encoding: "utf8",
         timeout: 20_000,
-        env: { PATH: `${bin}:/usr/bin:/bin`, MOCK_ROOT: root, MOCK_STATE: file, RUNNER_TOKEN: token },
+        env: {
+          PATH: `${bin}:/usr/bin:/bin`,
+          MOCK_ROOT: root,
+          MOCK_STATE: file,
+          RUNNER_TOKEN: token,
+          ORBIT_REPO: "example/orbit",
+        },
       });
     },
   };
@@ -223,8 +226,7 @@ function unchanged(before: MockState, after: MockState) {
       .slice(before.calls.length)
       .every(
         ({ cli, args }) =>
-          (cli === "git" ||
-            (cli === "gh" && !args.includes("POST") && !args.includes("DELETE")) ||
+          ((cli === "gh" && !args.includes("POST") && !args.includes("DELETE")) ||
             (cli === "docker" && (args[0] === "container" || args[0] === "exec"))) &&
           !args.some((arg) => arg.includes("./config.sh")),
       ),

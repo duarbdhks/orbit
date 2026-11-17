@@ -8,7 +8,7 @@ set -euo pipefail
 NAME=orbit-runner
 LABEL=orbit-ci-mac
 ROOT="$(cd "$(dirname "$0")/.." && pwd -P)"
-REPO="$(git -C "$ROOT" remote get-url origin | sed -E 's#^(git@github\.com:|https://github\.com/)##; s#\.git$##')"
+REPO="${ORBIT_REPO:-duarbdhks/orbit}"
 unset RUNNER_TOKEN
 
 compose() {
