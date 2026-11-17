@@ -17,7 +17,9 @@ export const SQL = {
   insertClassification: `WITH c AS (
       INSERT INTO classifications (channel_id, ts, work_related, importance, urgency, is_new, conflicts,
         needs_research, awaits_owner, route, reasons, source)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::text[], $12)
+      -- 분류하는 사이 수집기가 지운 메시지는 건너뛴다.
+      SELECT $1::text, $2::text, $3, $4, $5, $6, $7, $8, $9, $10, $11::text[], $12
+      WHERE EXISTS (SELECT 1 FROM messages m WHERE m.channel_id = $1::text AND m.ts = $2::text)
       ON CONFLICT DO NOTHING
       RETURNING channel_id, ts, route)
     INSERT INTO alerts (channel_id, ts)
