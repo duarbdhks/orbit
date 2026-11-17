@@ -66,7 +66,7 @@ qm_check() (
 
 shell_syntax() {
   local f
-  for f in scripts/*.sh scripts/mac/* scripts/probe/*.sh; do bash -n "$f" || return 1; done
+  for f in scripts/*.sh scripts/mac/*.sh scripts/mac/orbit-* scripts/probe/*.sh; do bash -n "$f" || return 1; done
 }
 
 compose_config() {
