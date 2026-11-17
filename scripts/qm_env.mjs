@@ -10,12 +10,14 @@ import { manifestRef } from "../qm/node_modules/@yc-software/qm/dist/src/manifes
 import { missingRequiredSecrets, computedSecrets, secretsForService, runtimeSecretNames } from "../qm/node_modules/@yc-software/qm/dist/src/secrets.js";
 import { hostedServiceEnv, virtualServiceEnv } from "../qm/node_modules/@yc-software/qm/dist/src/services.js";
 import { readEnvFile } from "../qm/node_modules/@yc-software/qm/dist/src/util.js";
+import { withCodexRuntime } from "./qm_runtime.mjs";
 
 const orbitHome = process.env.ORBIT_HOME ?? join(homedir(), "Library/Application Support/Orbit");
 const output = resolve(process.argv[2]);
 const initialize = process.argv.includes("--init");
-const { config } = loadConfigAt(fileURLToPath(new URL("../qm/qm.config.jsonc", import.meta.url)));
 const secrets = readEnvFile(join(orbitHome, "env/qm.env"));
+const { config: deploymentConfig } = loadConfigAt(fileURLToPath(new URL("../qm/qm.config.jsonc", import.meta.url)));
+const config = withCodexRuntime(deploymentConfig, secrets.get("ORBIT_CODEX_AUTH_CREDENTIAL"));
 const lookup = (name) => secrets.get(name)?.trim() ? secrets.get(name) : undefined;
 const statePath = join(process.env.XDG_CONFIG_HOME ?? join(homedir(), ".config"), "qm/deployments/orbit/state.json");
 const existingState = existsSync(statePath);

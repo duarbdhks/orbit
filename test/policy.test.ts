@@ -64,10 +64,42 @@ test("허용된 채널 메시지는 원문을 untrusted_slack_content 로 담는
     channel_name: "secret-room",
     ts: "1794787260.000200",
     thread_ts: "1794787200.000100",
+    user_id: "U1",
     user_name: "작성자",
     posted_at: "2026-11-16T00:01:00.000Z",
     permalink:
       "https://example.slack.com/archives/CREAL1/p1794787260000200?thread_ts=1794787200.000100&cid=CREAL1",
     untrusted_slack_content: "원문입니다",
   });
+});
+
+test("DM은 wildcard로 허용되지 않고 실데이터 허용과 일치하는 owner DM 증명이 모두 필요하다", () => {
+  const on = config({
+    ORBIT_ANALYZE_REAL_DATA: "true",
+    ORBIT_ANALYZE_CHANNELS: "*",
+    ORBIT_OWNER_USER_ID: "UOWNER",
+    ORBIT_OWNER_PRINCIPAL: "owner@qm",
+  });
+  const dm = { ...real, id: "D1" };
+  const message = { ...row, channel_id: "D1" };
+  assert.equal(modelAllowed(dm, on), false);
+  assert.equal("redacted" in forModel(message, dm, on), true);
+  const proof = {
+    id: "D1",
+    name: "DM:UOTHER",
+    kind: "owner_dm" as const,
+    owner_user_id: "UOWNER",
+    participant_user_id: "UOTHER",
+    principal: "owner@qm",
+  };
+  assert.equal("redacted" in forModel(message, proof, on), false);
+  for (const invalid of [
+    { ...proof, principal: "other@qm" },
+    { ...proof, owner_user_id: "UOTHER" },
+    { ...proof, participant_user_id: "UOWNER" },
+    { ...proof, id: "DOTHER" },
+    { ...proof, id: "C1" },
+  ])
+    assert.equal("redacted" in forModel(message, invalid, on), true);
+  assert.equal("redacted" in forModel(message, proof, config()), true);
 });

@@ -114,6 +114,7 @@ test("공백이 있는 실제 릴리스 경로에서도 QM 설정을 읽는다",
   mkdirSync(join(release, "scripts"), { recursive: true });
   mkdirSync(join(release, "qm"));
   copyFileSync("scripts/qm_env.mjs", join(release, "scripts/qm_env.mjs"));
+  copyFileSync("scripts/qm_runtime.mjs", join(release, "scripts/qm_runtime.mjs"));
   copyFileSync("qm/qm.config.jsonc", join(release, "qm/qm.config.jsonc"));
   symlinkSync(resolve("qm/node_modules"), join(release, "qm/node_modules"));
   const run = spawnSync(process.execPath, [join(release, "scripts/qm_env.mjs"), join(s.dir, "runtime")], {

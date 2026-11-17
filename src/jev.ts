@@ -83,7 +83,7 @@ export function createJev(db: Db, config: Config, fetchImpl: typeof fetch = fetc
           },
           body: JSON.stringify({ model: JEV_MODEL, state, questions }),
           redirect: "manual",
-          signal: AbortSignal.timeout(10_000),
+          signal: AbortSignal.timeout(3_500),
         });
       } catch {
         return null;

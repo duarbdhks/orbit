@@ -10,7 +10,9 @@ const load = async (name: string) =>
   JSON.parse(await readFile(new URL(`../fixtures/${name}`, import.meta.url), "utf8"));
 
 export async function evalRouter() {
-  const runtime = await evaluate((await load("router-eval.json")).runtime as Examples, (input) => tierOf(input).tier);
+  const examples = await load("router-eval.json");
+  const runtime = await evaluate(examples.runtime as Examples, (input) => tierOf(input).tier);
+  const runtime_choices = await evaluate(examples.runtime_choices as Examples, (input) => tierOf(input).runtime);
   const routes = await evaluate((await load("classify-eval.json")) as Examples, (text) => {
     const message = { channel_id: "C", ts: "1.0", thread_ts: null, user_id: "U", user_name: null, text, posted_at: new Date() };
     const context = { ownerUserId: "UOWNER", duplicate: false, threadStartedByOwner: false, ownerRepliedAfter: false };
@@ -18,6 +20,7 @@ export async function evalRouter() {
   });
   return {
     runtime,
+    runtime_choices,
     classify: routes,
     // hold 로 분류된 메시지는 AI 분석으로 넘어가지 않는다. simple 로 분류된 요청은 낮은 effort 로 간다.
     analysis_skipped: (routes.by_label.hold ?? 0) / routes.total,

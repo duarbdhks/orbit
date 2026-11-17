@@ -51,7 +51,9 @@ Slack DM <──(Bot 토큰, Socket Mode)── QM core (Codex 구독) ──> q
 ## Decision Router
 
 - 메시지 분류(`src/classify.ts`): 규칙이 관련성, 중요도, 긴급도, 신규, 충돌, 추가 조사, 주인 응답 대기, 경로(`notify_now`, `briefing`, `hold`)를 정한다. `hold`는 AI 분석으로 넘어가지 않는다.
-- 실행 경로(`src/router.ts`): 요청 문장으로 `simple`, `standard`, `complex`를 고른다. 모델과 effort는 QM decision rule의 선택지에 적고, QM이 자기 모델 카탈로그와 대조한다.
+- 실행 경로(`src/router.ts`): QM 턴 설명을 제외한 최신 요청으로 의도·근거 범위·추론 깊이·오류 영향을 판단한다. 인사·명시적 설정 조회는 로컬 규칙으로 즉시 처리하고, 그 밖에는 Jev의 네 독립 판단을 결합한다. `simple`, `extract`, `standard`, `precise`, `complex`를 QM의 모델·effort 조합에 연결한다.
+- `scripts/qm_configure.mjs`는 조직 Codex 기본값, 하위 턴 기본값, decision provider와 rule을 등록한다. 기본 실행은 `observe`이고 `enforce`를 명시해야 실제 모델을 바꾼다. 잘못된 응답·시간 초과·예산 소진은 규칙으로 대체한다.
+- collector는 토큰과 주인을 검증하는 내부 HTTP endpoint로 사람 검색과 요청한 개인 DM을 조회한다. API는 Slack 토큰을 받지 않는다. 개인 DM 원문을 수집 DB에 저장하지 않으며 `coverage`로 조회 범위와 한계를 반환한다.
 - `ORBIT_ROUTER_MODE`: `off`는 규칙만, `shadow`는 규칙 결과를 쓰고 Jev 답을 기록만, `active`는 Jev가 1위 0.6 이상이고 2위와 0.2 이상 차이 날 때만 Jev 결과를 쓴다.
 - Jev 요청은 `ORBIT_JEV_ENABLED=true`, 예산 0 초과, 키 있음, 오늘 사용액이 예산 미만일 때만 나간다. 기본값에서는 0건이다.
 

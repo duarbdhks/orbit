@@ -7,9 +7,12 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import type { FastifyInstance } from "fastify";
 import { type Config, loadConfig } from "../src/config.ts";
 import type { Db } from "../src/db.ts";
+import { buildCollectorServer } from "../src/live-slack.ts";
 import { classifyPass } from "../src/research.ts";
 import { loadSample } from "../src/sample.ts";
 import { buildServer } from "../src/server.ts";
+import { createSlack } from "../src/slack.ts";
+import { FAKE_TOKEN, startFakeSlack } from "./fake-slack.ts";
 import { testDb } from "./helpers.ts";
 
 const TOKEN = "t".repeat(32);
@@ -17,10 +20,12 @@ const AUTH = { authorization: `Bearer ${TOKEN}`, "x-qm-actor": "owner@qm" };
 const TOOLS = [
   "claim_unanalyzed",
   "collector_status",
+  "find_people",
   "get_alert",
   "get_thread",
   "list_knowledge",
   "mark_briefed",
+  "read_direct_messages",
   "search_messages",
   "submit_analysis",
 ];
@@ -315,4 +320,193 @@ test("MCP SDK 클라이언트가 실제 포트에 붙어 도구 목록을 받고
   await client.close();
   await app.close();
   await db.end();
+});
+
+const DAY_FROM = "2026-11-17T00:00:00+09:00";
+const DAY_TO = "2026-11-18T00:00:00+09:00";
+const DAY_SECONDS = Date.parse(DAY_FROM) / 1000;
+
+test("보존 기간 밖의 빈 검색은 완전한 빈 대화로 표시하지 않는다", async (t) => {
+  const { db } = await testDb();
+  const app = mcp(
+    db,
+    config({ ORBIT_RETENTION_DAYS: "2", ORBIT_ANALYZE_REAL_DATA: "true", ORBIT_ANALYZE_CHANNELS: "COLD" }),
+  );
+  t.after(async () => {
+    await app.close();
+    await db.end();
+  });
+  const from = new Date(Date.now() - 4 * 86_400_000).toISOString();
+  const to = new Date(Date.now() - 3 * 86_400_000).toISOString();
+  await db.query("INSERT INTO channels (id,name,kind,is_member) VALUES ('COLD','old','public',true)");
+  await db.query("INSERT INTO sync_state (channel_id,covered_from,covered_until) VALUES ('COLD',$1,now())", [
+    from,
+  ]);
+  const result = await call(app, "search_messages", { channel_id: "COLD", from, to });
+  assert.deepEqual(result.value.messages, []);
+  assert.equal(result.value.complete, false);
+  assert.equal(result.value.coverage.channels[0].collected_range_complete, false);
+  assert.ok(Date.parse(result.value.coverage.channels[0].covered_from) > Date.parse(to));
+});
+
+async function storeMessage(db: Db, ts: string, user: string, text: string, thread: string | null = null) {
+  await db.query(
+    `INSERT INTO messages (channel_id, ts, thread_ts, user_id, user_name, text, posted_at, source)
+      VALUES ('CROOM', $1::text, $2, $3, $3, $4, to_timestamp($1::text::numeric), 'incremental')`,
+    [ts, thread, user, text],
+  );
+}
+
+test("채널 이름과 한국 날짜로 query 없이 검색하고 마이크로초 단위 페이지를 빠짐없이 이어 간다", async (t) => {
+  const { db } = await testDb();
+  const app = mcp(db, config({ ORBIT_ANALYZE_REAL_DATA: "true", ORBIT_ANALYZE_CHANNELS: "CROOM" }));
+  t.after(async () => {
+    await app.close();
+    await db.end();
+  });
+  await db.query(`INSERT INTO channels (id, name, kind, is_member) VALUES
+    ('CROOM', 'pj-수픽', 'public', true), ('CBLOCKED', 'pj-수픽', 'private', true)`);
+  await db.query(
+    "INSERT INTO sync_state (channel_id, covered_from, covered_until) VALUES ('CROOM', $1, $2)",
+    [DAY_FROM, DAY_TO],
+  );
+  await storeMessage(db, `${DAY_SECONDS - 1}.000000`, "U2", "어제 제외");
+  for (let i = 0; i < 4; i++)
+    await storeMessage(
+      db,
+      `${DAY_SECONDS}.${String(i).padStart(6, "0")}`,
+      i % 2 ? "U2" : "USAMPLE0",
+      `오늘 ${i}`,
+    );
+  await storeMessage(db, `${DAY_SECONDS + 86400}.000000`, "U2", "다음 자정 제외");
+  for (const args of [{}, { limit: 2 }, { from: DAY_TO, to: DAY_FROM }])
+    assert.equal((await call(app, "search_messages", args)).isError, true);
+  const args = { channel_name: "#pj-수픽", from: DAY_FROM, to: DAY_TO, limit: 2 };
+  const first = await call(app, "search_messages", args);
+  assert.equal(first.isError, false);
+  assert.equal(first.value.pagination.complete, false);
+  assert.equal(first.value.complete, false);
+  assert.ok(first.value.next_cursor.posted_at.endsWith(".000002Z"));
+  const second = await call(app, "search_messages", { ...args, cursor: first.value.next_cursor });
+  assert.equal(second.value.pagination.complete, true);
+  assert.equal(second.value.next_cursor, null);
+  assert.equal(second.value.complete, false);
+  assert.ok(second.value.coverage.limitations[0].includes("스레드"));
+  assert.deepEqual(
+    [...first.value.messages, ...second.value.messages].map((m) => m.untrusted_slack_content),
+    ["오늘 3", "오늘 2", "오늘 1", "오늘 0"],
+  );
+  assert.deepEqual(
+    second.value.coverage.channels.map((ch: { channel_id: string }) => ch.channel_id),
+    ["CROOM"],
+  );
+  const author = await call(app, "search_messages", { ...args, user_id: "U2" });
+  assert.ok(author.value.messages.every((m: { user_id: string }) => m.user_id === "U2"));
+  assert.deepEqual(
+    author.value.messages.map((m: { untrusted_slack_content: string }) => m.untrusted_slack_content),
+    ["오늘 3", "오늘 1"],
+  );
+  assert.equal((await call(app, "search_messages", { channel_id: "CBLOCKED" })).isError, true);
+  await db.query(
+    "UPDATE sync_state SET covered_until = $1, last_error = 'ratelimited' WHERE channel_id = 'CROOM'",
+    [DAY_FROM],
+  );
+  const incomplete = await call(app, "search_messages", { ...args, limit: 50 });
+  assert.equal(incomplete.value.complete, false);
+  assert.equal(incomplete.value.coverage.channels[0].last_error, "ratelimited");
+});
+
+test("공동 참여 검색은 같은 방의 별개 발언을 대화로 꾸미지 않고 주인과 대상이 참여한 스레드만 찾는다", async (t) => {
+  const { db } = await testDb();
+  const app = mcp(db, config({ ORBIT_ANALYZE_REAL_DATA: "true", ORBIT_ANALYZE_CHANNELS: "CROOM" }));
+  t.after(async () => {
+    await app.close();
+    await db.end();
+  });
+  await db.query(
+    "INSERT INTO channels (id, name, kind, is_member) VALUES ('CROOM', 'pj-수픽', 'public', true)",
+  );
+  const at = (offset: number) => `${DAY_SECONDS + offset}.000000`;
+  await storeMessage(db, at(-1), "USAMPLE0", "어제 주인이 시작한 스레드");
+  await storeMessage(db, at(1), "U2", "오늘 영훈님 답글", at(-1));
+  await storeMessage(db, at(2), "USAMPLE0", "오늘 공동 스레드");
+  await storeMessage(db, at(3), "U2", "오늘 공동 답글", at(2));
+  await storeMessage(db, at(4), "U3", "같은 스레드의 문맥", at(2));
+  await storeMessage(db, at(5), "U2", "영훈님 별도 발언");
+  await storeMessage(db, at(6), "USAMPLE0", "주인의 별도 발언");
+  await storeMessage(db, at(7), "U2", "미래에 주인이 참여할 스레드");
+  await storeMessage(db, at(86401), "USAMPLE0", "기간 이후 참여", at(7));
+  const result = await call(app, "search_messages", {
+    participant_user_id: "U2",
+    from: DAY_FROM,
+    to: DAY_TO,
+  });
+  assert.deepEqual(
+    result.value.messages.map((m: { untrusted_slack_content: string }) => m.untrusted_slack_content),
+    ["같은 스레드의 문맥", "오늘 공동 답글", "오늘 공동 스레드", "오늘 영훈님 답글"],
+  );
+  const thread = await call(app, "get_thread", { channel_id: "CROOM", ts: at(3) });
+  assert.equal(thread.value.messages.length, 3);
+  assert.equal((await call(app, "search_messages", { participant_user_id: "USAMPLE0" })).isError, true);
+});
+
+test("owner MCP만 내부 브리지를 통해 DM을 읽고 원문은 forModel 한 필드로만 나가며 DB에 남지 않는다", async (t) => {
+  const { db } = await testDb();
+  const fake = await startFakeSlack(1);
+  fake.tokenOwner = "USAMPLE0";
+  fake.people.push({ id: "U2", name: "younghoon", real_name: "영훈" });
+  fake.directs.push({ id: "D2", user: "U2", is_im: true });
+  const CANARY = "private-owner-dm-canary";
+  fake.add("D2", { ts: `${DAY_SECONDS + 1}.000000`, user: "U2", text: CANARY });
+  const collectorConfig = config({
+    ORBIT_ANALYZE_REAL_DATA: "true",
+    SLACK_USER_TOKEN: FAKE_TOKEN,
+    SLACK_API_BASE: fake.url,
+  });
+  const collector = buildCollectorServer(
+    createSlack({ token: FAKE_TOKEN, baseUrl: fake.url }),
+    collectorConfig,
+  );
+  await collector.listen({ host: "127.0.0.1", port: 0 });
+  const apiConfig = config({
+    ORBIT_ANALYZE_REAL_DATA: "true",
+    ORBIT_COLLECTOR_URL: `http://127.0.0.1:${(collector.server.address() as AddressInfo).port}`,
+  });
+  assert.equal(apiConfig.SLACK_USER_TOKEN, "");
+  const app = mcp(db, apiConfig);
+  t.after(async () => {
+    await app.close();
+    await collector.close();
+    await fake.close();
+    await db.end();
+  });
+  const denied = await rpc(
+    app,
+    "tools/call",
+    { name: "read_direct_messages", arguments: { user_id: "U2", from: DAY_FROM, to: DAY_TO } },
+    { ...AUTH, "x-qm-actor": "intruder@qm" },
+  );
+  assert.equal(denied.statusCode, 401);
+  assert.deepEqual(fake.requests, []);
+  const found = await call(app, "find_people", { query: "영훈" });
+  assert.equal(found.value.people[0].user_id, "U2");
+  const dm = await call(app, "read_direct_messages", { user_id: "U2", from: DAY_FROM, to: DAY_TO });
+  assert.equal(dm.isError, false);
+  assert.equal(dm.value.messages[0].untrusted_slack_content, CANARY);
+  assert.equal(dm.value.messages[0].user_id, "U2");
+  assert.equal(dm.raw.split(CANARY).length - 1, 1);
+  assert.equal("text" in dm.value.messages[0], false);
+  assert.equal(dm.value.coverage.complete, false);
+  assert.equal((await db.query("SELECT count(*)::int AS n FROM messages")).rows[0].n, 0);
+  assert.equal(
+    (
+      await app.inject({
+        method: "POST",
+        url: "/internal/find_people",
+        headers: AUTH,
+        payload: { query: "영훈" },
+      })
+    ).statusCode,
+    404,
+  );
 });

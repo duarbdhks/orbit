@@ -55,7 +55,27 @@ Codex와 Slack이 연결된 뒤 Orbit 봇에게 DM으로 요청한다. QM이 cro
 
 ## 실행 경로 라우팅 (선택)
 
-QM 설정의 Decision rules에서 `turn_start` 규칙을 만든다. provider는 프로토콜 `decisions`, 주소 `http://orbit-api:8787`, 자격은 `Authorization: Bearer <ORBIT_API_TOKEN>`이다. 선택지 값은 `simple`, `standard`, `complex`로 하고, `standard`는 `keep`, 나머지는 `use_runtime`에 QM 모델 목록의 모델과 effort를 적는다. 처음에는 `observe`로 둔다.
+`env/orbit.env`에 `ORBIT_DECISION_PORT=80`을 둔다. MCP의 기존 8787 포트는 유지한다. QM 0.1.18의 service credential이 포트 없는 호스트를 요구해서 decision provider만 내부 기본 HTTP 포트를 쓴다. 외부 포트는 열지 않는다.
+
+조직 Codex는 별도 로그인으로 얻은 `.codex/auth.json` 파일 자격을 QM 암호화 keychain에 등록하고, 그 자격 ID를 `env/qm.env`의 `ORBIT_CODEX_AUTH_CREDENTIAL`에 적는다. 개인 로그인과 같은 refresh token을 복제하지 않는다. `scripts/qm_env.mjs`가 고정된 QM 설정에 이 자격 참조와 Codex 기본값을 더한다. `qm/`의 배포 원본은 수정하지 않는다.
+
+```bash
+scripts/compose.sh prepare
+scripts/compose.sh up -d --wait qm-core
+node scripts/qm_configure.mjs observe
+# 실제 선택과 모델 요청 기록을 확인한 뒤 적용한다.
+node scripts/qm_configure.mjs enforce
+```
+
+등록 조합은 Luna medium, Luna max, Sol medium, Terra max, Astra high다. 인사·설정 조회, 추출, 일반 요약, 여러 출처 대조, 원인 조사 순으로 구분한다. 잘못된 Jev 응답은 Sol 중심의 규칙으로 대체한다. `node scripts/qm_configure.mjs off`로 모델 선택 규칙을 중지할 수 있다. 예약 작업의 enabled 값은 바꾸지 않는다.
+
+## 개인 DM 조회와 대기 표시
+
+Collector 앱에 User scope `im:read`, `im:history`를 추가해 재설치한다. 봇 scope와 그룹 DM 권한은 추가하지 않는다. `env/collector.env`에는 `ORBIT_API_TOKEN`, `ORBIT_OWNER_PRINCIPAL`, `ORBIT_OWNER_USER_ID`, `ORBIT_ANALYZE_REAL_DATA=true`도 API와 같게 둔다. collector의 내부 8788 포트는 호스트에 게시하지 않는다.
+
+사람을 지정하면 `find_people`로 후보를 확인한 뒤 `read_direct_messages`에 상대 ID와 ISO 8601 기간을 보낸다. 오늘은 한국 시간 00시부터 다음 날 00시 미만이다. DM은 최대 7일을 조회하고, 기간 전에 시작된 스레드 답글은 누락될 수 있다. `coverage.complete=false`를 전체 대화가 없다는 뜻으로 해석하면 안 된다.
+
+`assets/orbit/icon.png`는 프로필, `working.gif`는 `orbit-working` custom emoji로 등록한다. 등록 스크립트는 이 이름을 대기 리액션으로 설정하고 주인의 기존 스레드에 진행 카드를 켠다. 일반 DM의 대화 위치는 바꾸지 않는다. 이모지 선택이 실패하면 QM의 기본 `eyes` 리액션을 쓴다.
 
 ## 일상 명령
 

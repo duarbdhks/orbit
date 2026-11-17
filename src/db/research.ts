@@ -30,13 +30,26 @@ export const SQL = {
     FROM alerts a JOIN messages m ON m.channel_id = a.channel_id AND m.ts = a.ts
     WHERE a.webhook_sent_at IS NULL ORDER BY a.id`,
   markWebhookSent: "UPDATE alerts SET webhook_sent_at = now() WHERE id = $1 AND webhook_sent_at IS NULL",
-  channels: "SELECT id, name, is_sample FROM channels",
-  searchMessages: `SELECT ${MESSAGE} FROM ${MESSAGE_FROM}
-    WHERE m.channel_id = ANY($1::text[]) AND m.text ILIKE '%' || $2::text || '%'
+  channels: `SELECT ch.id, ch.name, ch.is_sample, ch.access_state,
+      s.covered_from, s.covered_until, s.last_error
+    FROM channels ch LEFT JOIN sync_state s ON s.channel_id = ch.id ORDER BY ch.id`,
+  searchMessages: `SELECT ${MESSAGE},
+      to_char(m.posted_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_posted_at
+    FROM ${MESSAGE_FROM}
+    WHERE m.channel_id = ANY($1::text[]) AND ($2::text IS NULL OR m.text ILIKE '%' || $2 || '%')
       AND ($3::text IS NULL OR m.channel_id = $3)
       AND ($4::timestamptz IS NULL OR m.posted_at >= $4)
       AND ($5::timestamptz IS NULL OR m.posted_at < $5)
-    ORDER BY m.posted_at DESC LIMIT $6::int`,
+      AND ($7::text IS NULL OR m.user_id = $7)
+      AND ($8::text IS NULL OR (
+        EXISTS (SELECT 1 FROM messages p WHERE p.channel_id = m.channel_id
+          AND (p.ts = coalesce(m.thread_ts, m.ts) OR p.thread_ts = coalesce(m.thread_ts, m.ts)) AND p.user_id = $8
+          AND ($5::timestamptz IS NULL OR p.posted_at < $5))
+        AND EXISTS (SELECT 1 FROM messages o WHERE o.channel_id = m.channel_id
+          AND (o.ts = coalesce(m.thread_ts, m.ts) OR o.thread_ts = coalesce(m.thread_ts, m.ts)) AND o.user_id = $9::text
+          AND ($5::timestamptz IS NULL OR o.posted_at < $5))))
+      AND ($10::timestamptz IS NULL OR (m.posted_at, m.channel_id, m.ts) < ($10, $11::text, $12::text))
+    ORDER BY m.posted_at DESC, m.channel_id DESC, m.ts DESC LIMIT $6::int`,
   thread: `WITH root AS (
       SELECT coalesce((SELECT thread_ts FROM messages WHERE channel_id = $1::text AND ts = $2::text), $2::text) AS ts)
     SELECT ${MESSAGE} FROM ${MESSAGE_FROM} CROSS JOIN root

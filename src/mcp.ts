@@ -1,15 +1,24 @@
-import { createHash, timingSafeEqual } from "node:crypto";
-import type { FastifyInstance, FastifyRequest } from "fastify";
+import type { FastifyInstance } from "fastify";
 import type pg from "pg";
 import { z } from "zod";
 import { type BriefingItem, composeBriefing } from "./briefing.ts";
 import type { Config } from "./config.ts";
 import { SQL } from "./db/research.ts";
 import type { Db } from "./db.ts";
-import { forModel, modelAllowed, permalink } from "./policy.ts";
+import { createLiveSlackClient, FindPeopleInput, ReadDirectMessagesInput } from "./live-slack.ts";
+import { authorized, forModel, modelAllowed, ownerCall, permalink } from "./policy.ts";
 import { DECISION_STATES, KINDS, type Message } from "./types.ts";
 
 type MessageRow = Message & { channel_name: string; is_sample: boolean };
+interface SearchChannel {
+  id: string;
+  name: string;
+  is_sample: boolean;
+  access_state: string;
+  covered_from: Date | null;
+  covered_until: Date | null;
+  last_error: string | null;
+}
 interface Status {
   ingest_lag_p95_seconds: number | null;
   rate_limited_24h: number;
@@ -59,18 +68,6 @@ function tool<T extends z.ZodType>(
   return { description: description + UNTRUSTED, input, run: (args) => run(input.parse(args)) };
 }
 
-function authorized(req: FastifyRequest, config: Config): boolean {
-  if (!config.ORBIT_API_TOKEN) return false;
-  // 길이가 달라도 비교 시간이 같도록 해시끼리 견준다.
-  const digest = (value: string) => createHash("sha256").update(value).digest();
-  return timingSafeEqual(digest(req.headers.authorization ?? ""), digest(`Bearer ${config.ORBIT_API_TOKEN}`));
-}
-
-// QM 은 도구 목록을 사람 없이 조회한다. 데이터를 돌려주는 tools/call 만 주인이 한 호출인지 본다.
-function ownerCall(req: FastifyRequest, config: Config): boolean {
-  return config.ORBIT_OWNER_PRINCIPAL !== "" && req.headers["x-qm-actor"] === config.ORBIT_OWNER_PRINCIPAL;
-}
-
 async function transaction<T>(db: Db, work: (client: pg.PoolClient) => Promise<T>): Promise<T> {
   const client = await db.connect();
   try {
@@ -92,35 +89,153 @@ const columns = (refs: { channel_id: string; ts: string }[]) => {
 };
 
 export function registerMcp(app: FastifyInstance, db: Db, config: Config): void {
+  const live = createLiveSlackClient(config);
   const toModel = (r: MessageRow) =>
     forModel(r, { id: r.channel_id, name: r.channel_name, is_sample: r.is_sample }, config);
-  const allowedChannels = async () =>
-    (await db.query<{ id: string; is_sample: boolean }>(SQL.channels)).rows
-      .filter((ch) => modelAllowed(ch, config))
-      .map((ch) => ch.id);
+  const permittedChannels = async () =>
+    (await db.query<SearchChannel>(SQL.channels)).rows.filter((ch) => modelAllowed(ch, config));
+  const allowedChannels = async () => (await permittedChannels()).map((ch) => ch.id);
   const status = async () => (await db.query<Status>(SQL.collectorStatus)).rows[0] as Status;
 
   const tools: Record<string, Tool> = {
     search_messages: tool(
-      "본문에 query 가 든 메시지를 최신순으로 찾는다. 모델 전송이 허용된 채널만 찾는다. from/to 는 ISO 8601 시각이다.",
-      z.object({
-        query: Text(200),
-        channel_id: Id.optional(),
-        from: Time.optional(),
-        to: Time.optional(),
-        limit: z.number().int().min(1).max(50).default(20),
-      }),
+      "허용된 수집 채널에서 최신순으로 찾는다. 채널의 오늘 대화 정리는 channel_name 과 from/to 로 query 없이 조회한다. from 포함, to 제외 ISO 8601 이며 한국의 오늘은 +09:00 자정부터 다음 자정까지 명시한다. user_id 는 작성자, participant_user_id 는 주인과 그 사람이 실제 참여한 같은 스레드의 기간 내 메시지를 찾는다. 참여 여부는 저장된 스레드에서 to 이전의 메시지로 확인한다. 사람과 나눈 대화는 find_people 로 ID 확인 후 DM 조회와 이 공동 참여 검색을 함께 사용한다. 다음 페이지는 같은 필터와 next_cursor 를 cursor 로 전달한다. pagination 과 coverage 를 보고 누락이나 수집 지연이 있으면 하루 전체를 확인했다고 하지 않는다.",
+      z
+        .object({
+          query: Text(200).optional(),
+          channel_id: Id.optional(),
+          channel_name: z.string().trim().min(1).max(100).optional(),
+          user_id: Id.optional(),
+          participant_user_id: Id.optional(),
+          from: Time.optional(),
+          to: Time.optional(),
+          limit: z.number().int().min(1).max(50).default(20),
+          cursor: z.object({ posted_at: Time, channel_id: Id, ts: Id }).optional(),
+        })
+        .refine(
+          (a) =>
+            a.query || a.channel_id || a.channel_name || a.user_id || a.participant_user_id || a.from || a.to,
+          "query 를 생략하려면 채널, 날짜 또는 사용자 필터가 필요합니다",
+        )
+        .refine(
+          (a) => !a.from || !a.to || Date.parse(a.from) < Date.parse(a.to),
+          "from 은 to 보다 빨라야 합니다",
+        ),
       async (a) => {
-        const pattern = a.query.replace(/[\\%_]/g, "\\$&");
-        const { rows } = await db.query<MessageRow>(SQL.searchMessages, [
-          await allowedChannels(),
+        const channels = await permittedChannels();
+        let selected = channels;
+        if (a.channel_id) selected = selected.filter((ch) => ch.id === a.channel_id);
+        if (a.channel_name) {
+          const name = a.channel_name.replace(/^#/, "");
+          selected = selected.filter((ch) => ch.name === name);
+          if (selected.length > 1)
+            return {
+              ambiguous: true,
+              channels: selected.map((ch) => ({ channel_id: ch.id, channel_name: ch.name })),
+            };
+        }
+        if ((a.channel_id || a.channel_name) && selected.length === 0)
+          throw new Error("허용된 수집 채널을 찾을 수 없습니다");
+        if (
+          a.participant_user_id &&
+          (!config.ORBIT_OWNER_USER_ID || a.participant_user_id === config.ORBIT_OWNER_USER_ID)
+        )
+          throw new Error("공동 참여 검색에는 주인과 다른 대상 사용자 ID가 필요합니다");
+        const pattern = a.query?.replace(/[\\%_]/g, "\\$&") ?? null;
+        const { rows } = await db.query<MessageRow & { cursor_posted_at: string }>(SQL.searchMessages, [
+          selected.map((ch) => ch.id),
           pattern,
           a.channel_id ?? null,
           a.from ?? null,
           a.to ?? null,
-          a.limit,
+          a.limit + 1,
+          a.user_id ?? null,
+          a.participant_user_id ?? null,
+          config.ORBIT_OWNER_USER_ID,
+          a.cursor?.posted_at ?? null,
+          a.cursor?.channel_id ?? null,
+          a.cursor?.ts ?? null,
         ]);
-        return { messages: rows.map(toModel) };
+        const messages = rows.slice(0, a.limit);
+        const last = messages.at(-1);
+        const hasMore = rows.length > a.limit;
+        const retainedFrom = Date.now() - config.ORBIT_RETENTION_DAYS * 86_400_000;
+        const coverage = selected.map((ch) => ({
+          channel_id: ch.id,
+          covered_from: ch.covered_from
+            ? new Date(Math.max(ch.covered_from.getTime(), retainedFrom)).toISOString()
+            : null,
+          covered_until: ch.covered_until?.toISOString() ?? null,
+          last_error: ch.last_error,
+          collected_range_complete: Boolean(
+            a.from &&
+              a.to &&
+              ch.access_state === "active" &&
+              !ch.last_error &&
+              ch.covered_from &&
+              ch.covered_from.getTime() <= Date.parse(a.from) &&
+              retainedFrom <= Date.parse(a.from) &&
+              ch.covered_until &&
+              ch.covered_until.getTime() >= Date.parse(a.to),
+          ),
+        }));
+        return {
+          messages: messages.map(toModel),
+          pagination: { complete: !hasMore },
+          next_cursor:
+            hasMore && last
+              ? { posted_at: last.cursor_posted_at, channel_id: last.channel_id, ts: last.ts }
+              : null,
+          coverage: {
+            source: "collected_channels",
+            limitations: [
+              "이전에 시작된 스레드의 새 답글은 수집에서 누락될 수 있습니다. 수집된 메시지에 한해 요약합니다.",
+            ],
+            from: a.from ?? null,
+            to: a.to ?? null,
+            channels: coverage,
+          },
+          complete: false,
+        };
+      },
+    ),
+    find_people: tool(
+      "이름으로 Slack 사용자를 실시간 검색한다. 중복 후보를 모두 돌려주므로 ambiguous 이면 임의로 고르지 말고 사용자를 확인한다. 반환된 user_id 를 DM 조회와 채널 공동 참여 검색에 쓴다.",
+      FindPeopleInput,
+      (a) => live.findPeople(a),
+    ),
+    read_direct_messages: tool(
+      "주인과 대상 user_id 의 기존 1:1 DM만 요청할 때 조회한다. DB에 저장하지 않는다. from 포함, to 제외 ISO 8601, 최대 7일이다. 한국의 오늘은 +09:00 자정부터 다음 자정까지 명시한다. 기간 안에 시작된 스레드의 답글을 포함한다. 기간 이전 스레드의 답글은 발견하지 못하므로 coverage 의 한계를 밝힌다. 사람과 나눈 대화 정리는 search_messages 의 participant_user_id 로 공동 참여한 채널 스레드도 함께 조회한다.",
+      ReadDirectMessagesInput,
+      async (a) => {
+        const { messages, ...result } = await live.readDirectMessages(a);
+        const channel = result.channel_id;
+        if (channel === null) return { ...result, messages: [] };
+        return {
+          ...result,
+          messages: messages.map((m) =>
+            forModel(
+              {
+                channel_id: channel,
+                ts: m.ts,
+                thread_ts: m.thread_ts ?? null,
+                user_id: m.user ?? null,
+                user_name: m.user ?? null,
+                text: m.text,
+                posted_at: new Date(Number(m.ts) * 1000),
+              },
+              {
+                id: channel,
+                name: `DM:${a.user_id}`,
+                kind: "owner_dm",
+                owner_user_id: result.owner_user_id,
+                participant_user_id: a.user_id,
+                principal: config.ORBIT_OWNER_PRINCIPAL,
+              },
+              config,
+            ),
+          ),
+        };
       },
     ),
     get_thread: tool("스레드의 부모 메시지와 답글을 시간순으로 돌려준다.", Ref, async (a) => ({
@@ -280,7 +395,8 @@ export function registerMcp(app: FastifyInstance, db: Db, config: Config): void 
   }
 
   app.post("/mcp", async (req, reply) => {
-    if (!authorized(req, config)) return reply.code(401).send({ error: "unauthorized" });
+    if (!authorized(req.headers.authorization, config))
+      return reply.code(401).send({ error: "unauthorized" });
     const msg = Rpc.safeParse(req.body);
     if (!msg.success) {
       return reply
@@ -288,7 +404,7 @@ export function registerMcp(app: FastifyInstance, db: Db, config: Config): void 
         .send({ jsonrpc: "2.0", id: null, error: { code: -32600, message: "Invalid Request" } });
     }
     const { id, method, params } = msg.data;
-    if (method === "tools/call" && !ownerCall(req, config))
+    if (method === "tools/call" && !ownerCall(req.headers["x-qm-actor"], config))
       return reply.code(401).send({ error: "unauthorized" });
     if (id === undefined) return reply.code(202).send();
     return { jsonrpc: "2.0", id, ...(await answer(method, params ?? {})) };
