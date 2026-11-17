@@ -21,9 +21,7 @@ plist() {  # 작업 이름
   <key>Label</key><string>com.yeumgw.orbit.$1</string>
   <key>ProgramArguments</key>
   <array>
-    <string>/bin/bash</string>
-    <string>$ORBIT_HOME/current/scripts/mac/agent.sh</string>
-    <string>$1</string>
+    <string>$ORBIT_HOME/current/scripts/mac/orbit-$1</string>
   </array>
   <key>StartInterval</key><integer>300</integer>
   <key>RunAtLoad</key><true/>
