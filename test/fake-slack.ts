@@ -66,9 +66,9 @@ export async function startFakeSlack(pageSize = 3) {
     if (error) return { ok: false, error };
     const own = messages.filter((m) => m.channel === channel).sort((a, b) => Number(a.ts) - Number(b.ts));
     switch (method) {
-      case "conversations.list": {
-        const { items, response_metadata } = page(channels, p);
-        return { ok: true, channels: items, response_metadata };
+      case "conversations.info": {
+        const found = channels.find((c) => c.id === channel);
+        return found ? { ok: true, channel: found } : { ok: false, error: "channel_not_found" };
       }
       case "conversations.history": {
         const inclusive = p.get("inclusive") === "true";

@@ -22,9 +22,7 @@ export type SlackMessage = z.infer<typeof Message>;
 
 const Ok = z.object({ ok: z.boolean(), error: z.string().optional() });
 const Cursor = z.object({ next_cursor: z.string() }).optional();
-const Channels = z
-  .object({ channels: z.array(Channel), response_metadata: Cursor })
-  .transform((b) => ({ items: b.channels, cursor: b.response_metadata?.next_cursor }));
+const ChannelInfo = z.object({ channel: Channel }).transform((b) => b.channel);
 const Messages = z
   .object({ messages: z.array(Message), response_metadata: Cursor })
   .transform((b) => ({ items: b.messages, cursor: b.response_metadata?.next_cursor }));
@@ -45,7 +43,7 @@ export class SlackError extends Error {
 }
 
 export interface Slack {
-  list(): Promise<SlackChannel[]>;
+  info(channel: string): Promise<SlackChannel>;
   history(channel: string, oldest: string, latest: string, limit: number): Promise<SlackMessage[]>;
   historyPage(channel: string, latest: string, limit: number): Promise<SlackMessage[]>;
   replies(channel: string, threadTs: string): Promise<SlackMessage[]>;
@@ -117,12 +115,8 @@ export function createSlack(options: { token: string; baseUrl: string }): Slack 
   }
 
   return {
-    list: () =>
-      all(
-        "conversations.list",
-        { types: "public_channel,private_channel", exclude_archived: "true", limit: "200" },
-        Channels,
-      ),
+    // 워크스페이스 전체 목록(conversations.list)은 채널 530개에서 117회 호출, 약 12분이 걸려 수집을 막았다.
+    info: (channel) => call("conversations.info", { channel }, ChannelInfo),
     history: (channel, oldest, latest, limit) =>
       all(
         "conversations.history",

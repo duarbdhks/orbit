@@ -3,8 +3,6 @@ export const SQL = {
     SELECT r.id, r.name, r.kind, r.is_member
     FROM jsonb_to_recordset($1::jsonb) AS r (id text, name text, kind text, is_member boolean)
     ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, kind = EXCLUDED.kind, is_member = EXCLUDED.is_member`,
-  markMissingLost: `UPDATE channels SET access_state = 'lost', access_lost_at = $2
-    WHERE access_state = 'active' AND NOT is_sample AND id <> ALL($1::text[])`,
   markLost:
     "UPDATE channels SET access_state = 'lost', access_lost_at = $2 WHERE id = $1 AND access_state = 'active'",
   activeChannels: `SELECT c.id, s.covered_from, s.covered_until
