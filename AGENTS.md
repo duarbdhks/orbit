@@ -10,6 +10,7 @@ Orbit은 QM 위에서 동작하는 Slack 개인 AI 비서다. QM은 `qm/`에서 
 
 ## 규칙
 
+- 브라우저가 필요하면 `/ego-browser`를 쓴다.
 - 의존성은 정확한 버전으로 고정한다. 몇 줄로 되는 일에 의존성을 더하지 않는다.
 - 스키마 변경은 `migrations/`에 추가만 한다. `DROP`, `RENAME`, `ALTER TYPE`, `CONCURRENTLY`, 기본값 없는 `ADD COLUMN ... NOT NULL`은 lint가 막는다.
 - SQL은 `src/db/`의 이름 붙은 문장으로 둔다. `selfcheck`가 전부 PREPARE 한다.
