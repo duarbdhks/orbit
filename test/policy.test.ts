@@ -25,7 +25,10 @@ test("샘플 채널은 늘 모델로 보내고 실제 채널은 실데이터 분
   assert.equal(modelAllowed(real, config({ ORBIT_ANALYZE_REAL_DATA: "true" })), false);
   const on = config({ ORBIT_ANALYZE_REAL_DATA: "true", ORBIT_ANALYZE_CHANNELS: "COTHER, CREAL1" });
   assert.equal(modelAllowed(real, on), true);
-  assert.equal(modelAllowed(real, config({ ORBIT_ANALYZE_REAL_DATA: "true", ORBIT_ANALYZE_CHANNELS: "*" })), true);
+  assert.equal(
+    modelAllowed(real, config({ ORBIT_ANALYZE_REAL_DATA: "true", ORBIT_ANALYZE_CHANNELS: "*" })),
+    true,
+  );
   assert.equal(modelAllowed(real, config({ ORBIT_ANALYZE_CHANNELS: "*" })), false);
 });
 
