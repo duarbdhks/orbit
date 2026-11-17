@@ -60,6 +60,10 @@ gitleaks_scan() {
   "$dir/gitleaks" detect --no-git --redact -c .gitleaks.toml --exit-code 1 -s .
 }
 
+qm_check() (
+  cd qm && npm ci --no-audit --no-fund && npm exec qm -- check
+)
+
 echo "ci_gate: $SHA"
 # gitleaks는 의존성과 테스트 산출물이 생기기 전의 트리를 본다.
 step gitleaks gitleaks_scan
@@ -68,6 +72,7 @@ step typecheck npm run -s typecheck
 step lint npm run -s lint
 step test npm test
 step audit npm audit --audit-level=high
+step qmcheck qm_check
 
 if [ -n "$FAILED" ]; then
   echo "ci_gate: 실패 -$FAILED"
