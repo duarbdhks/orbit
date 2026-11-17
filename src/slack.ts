@@ -66,6 +66,8 @@ export function createSlack(options: { token: string; baseUrl: string }): Slack 
         method: "POST",
         headers: { authorization: `Bearer ${options.token}` },
         body: new URLSearchParams(params),
+        // 응답 없는 연결 하나가 전역 큐 전체를 멈추지 않게 한다.
+        signal: AbortSignal.timeout(30_000),
       });
       if (res.status === 429) {
         stats.rateLimited++;

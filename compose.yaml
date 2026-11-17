@@ -23,6 +23,7 @@ services:
     image: orbit:${ORBIT_IMAGE_TAG:?}
     container_name: orbit-api
     restart: unless-stopped
+    init: true
     command: ["node", "src/main.ts", "api"]
     env_file: ["${ORBIT_HOME:?}/env/orbit.env"]
     environment:
@@ -41,6 +42,20 @@ services:
       interval: 5s
       timeout: 3s
       retries: 12
+
+  # Slack User 토큰은 이 컨테이너만 갖는다.
+  orbit-collector:
+    image: orbit:${ORBIT_IMAGE_TAG:?}
+    container_name: orbit-collector
+    restart: unless-stopped
+    init: true
+    command: ["node", "src/main.ts", "collector"]
+    env_file: ["${ORBIT_HOME:?}/env/collector.env"]
+    environment:
+      DATABASE_URL: postgres://orbit:${ORBIT_PG_PASSWORD}@orbit-pg:5432/orbit
+    depends_on:
+      orbit-pg:
+        condition: service_healthy
 
 networks:
   qm:

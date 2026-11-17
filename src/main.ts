@@ -1,6 +1,9 @@
+import { setTimeout as sleep } from "node:timers/promises";
+import { createCollector } from "./collector.ts";
 import { loadConfig } from "./config.ts";
 import { connect, migrate, pendingMigrations, selfcheck } from "./db.ts";
 import { buildServer } from "./server.ts";
+import { createSlack, SlackError } from "./slack.ts";
 import { statements } from "./sql.ts";
 
 const [command, option] = process.argv.slice(2);
@@ -21,7 +24,20 @@ switch (command) {
   case "api":
     await buildServer(db).listen({ host: "0.0.0.0", port: config.PORT });
     break;
+  case "collector": {
+    const slack = createSlack({ token: config.SLACK_USER_TOKEN, baseUrl: config.SLACK_API_BASE });
+    const collector = createCollector(db, slack, config);
+    for (;;) {
+      try {
+        await collector.tick(new Date());
+      } catch (e) {
+        // 오류 메시지에는 본문 조각이 섞일 수 있어 코드나 종류만 남긴다.
+        console.error(`collector tick 실패: ${e instanceof SlackError ? e.code : (e as Error).name}`);
+      }
+      await sleep(300_000);
+    }
+  }
   default:
-    console.error("사용법: node src/main.ts migrate [--pending] | selfcheck | api");
+    console.error("사용법: node src/main.ts migrate [--pending] | selfcheck | api | collector");
     process.exit(2);
 }

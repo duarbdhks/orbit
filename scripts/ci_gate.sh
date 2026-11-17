@@ -70,7 +70,7 @@ shell_syntax() {
 }
 
 compose_config() {
-  mkdir -p "$ROOT/home/env" && : > "$ROOT/home/env/orbit.env" || return 1
+  mkdir -p "$ROOT/home/env" && : > "$ROOT/home/env/orbit.env" && : > "$ROOT/home/env/collector.env" || return 1
   ORBIT_HOME="$ROOT/home" ORBIT_IMAGE_TAG=gate ORBIT_PG_PASSWORD=gate docker compose -f compose.yaml config -q
 }
 
