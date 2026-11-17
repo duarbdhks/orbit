@@ -23,6 +23,7 @@ const Env = z.object({
   ORBIT_OWNER_USER_ID: z.string().default(""),
   SLACK_USER_TOKEN: z.string().default(""),
   SLACK_API_BASE: z.string().default("https://slack.com/api"),
+  ORBIT_SLACK_BASE_URL: z.string().default("https://slack.com"),
   ORBIT_COLLECT_CHANNELS: list,
   ORBIT_BACKFILL_DAYS: z.coerce.number().int().positive().default(30),
   ORBIT_RETENTION_DAYS: z.coerce.number().int().positive().default(180),
