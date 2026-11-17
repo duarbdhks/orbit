@@ -52,7 +52,8 @@ export async function classifyPass(
   }
 
   const url = config.ORBIT_QM_WEBHOOK_URL;
-  if (!url) return;
+  // 서명 키 없이 보내면 QM 이 거부한다. 둘 다 있어야 보낸다.
+  if (!url || !config.ORBIT_QM_WEBHOOK_SECRET) return;
   const send = deps.fetch ?? fetch;
   const alerts = await db.query<{ id: number; channel_id: string; ts: string; thread_ts: string | null }>(
     SQL.unsentAlerts,

@@ -7,7 +7,6 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import type { FastifyInstance } from "fastify";
 import { type Config, loadConfig } from "../src/config.ts";
 import type { Db } from "../src/db.ts";
-import { registerMcp } from "../src/mcp.ts";
 import { classifyPass } from "../src/research.ts";
 import { loadSample } from "../src/sample.ts";
 import { buildServer } from "../src/server.ts";
@@ -39,9 +38,7 @@ const responses = JSON.parse(
 );
 
 function mcp(db: Db, cfg: Config): FastifyInstance {
-  const app = buildServer(db);
-  registerMcp(app, db, cfg);
-  return app;
+  return buildServer(db, cfg);
 }
 
 let nextId = 1;
@@ -268,7 +265,12 @@ test("mark_briefed 뒤에는 그 항목이 미전달 목록에서 빠지고 알�
   const ids: number[] = (await call(app, "submit_analysis", responses.valid)).value.item_ids;
   const before = await call(app, "list_knowledge", { unbriefed_only: true });
   assert.equal(before.value.items.length, 6);
-  const alertId = (await db.query("SELECT id FROM alerts ORDER BY id LIMIT 1")).rows[0].id;
+  // 샘플 메시지는 오래돼서 알림이 생기지 않는다. 전달 표시를 보려고 하나 만든다.
+  const alertId = (
+    await db.query(
+      "INSERT INTO alerts (channel_id, ts) SELECT channel_id, ts FROM messages ORDER BY ts LIMIT 1 RETURNING id",
+    )
+  ).rows[0].id;
 
   const marked = await call(app, "mark_briefed", {
     kind: "daily",

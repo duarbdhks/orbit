@@ -20,7 +20,9 @@ export const SQL = {
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::text[], $12)
       ON CONFLICT DO NOTHING
       RETURNING channel_id, ts, route)
-    INSERT INTO alerts (channel_id, ts) SELECT channel_id, ts FROM c WHERE route = 'notify_now'
+    INSERT INTO alerts (channel_id, ts)
+    SELECT c.channel_id, c.ts FROM c JOIN messages m ON m.channel_id = c.channel_id AND m.ts = c.ts
+    WHERE c.route = 'notify_now' AND m.posted_at > now() - interval '1 hour'
     ON CONFLICT DO NOTHING`,
   unsentAlerts: `SELECT a.id, a.channel_id, a.ts, m.thread_ts
     FROM alerts a JOIN messages m ON m.channel_id = a.channel_id AND m.ts = a.ts
@@ -85,7 +87,7 @@ export const SQL = {
         AS max_queue_depth_24h,
       (SELECT coalesce(json_agg(json_build_object('channel_id', ch.id, 'covered_until', s.covered_until,
           'last_error', s.last_error) ORDER BY ch.id), '[]')
-        FROM channels ch LEFT JOIN sync_state s ON s.channel_id = ch.id) AS channels`,
+        FROM channels ch JOIN sync_state s ON s.channel_id = ch.id) AS channels`,
   insertSampleChannel: `INSERT INTO channels (id, name, kind, is_member, is_sample) VALUES ($1, $2, 'public', true, true)
     ON CONFLICT (id) DO NOTHING`,
   insertSampleMessage: `INSERT INTO messages (channel_id, ts, thread_ts, user_id, user_name, text, posted_at, source)

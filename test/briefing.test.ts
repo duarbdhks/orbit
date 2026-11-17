@@ -3,7 +3,6 @@ import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 import { type BriefingItem, composeBriefing } from "../src/briefing.ts";
 import { loadConfig } from "../src/config.ts";
-import { registerMcp } from "../src/mcp.ts";
 import { classifyPass } from "../src/research.ts";
 import { loadSample } from "../src/sample.ts";
 import { buildServer } from "../src/server.ts";
@@ -56,8 +55,7 @@ test("샘플에 정상 모의 응답을 제출하면 브리핑에 permalink 와 
   });
   await loadSample(db);
   await classifyPass(db, config);
-  const app = buildServer(db);
-  registerMcp(app, db, config);
+  const app = buildServer(db, config);
   const headers = { authorization: `Bearer ${config.ORBIT_API_TOKEN}`, "x-qm-actor": "owner@qm" };
   const call = async (name: string, args: unknown) => {
     const res = await app.inject({

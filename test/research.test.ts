@@ -21,7 +21,12 @@ const WEBHOOK = {
   ORBIT_QM_WEBHOOK_SECRET: "webhook-secret",
 };
 
-async function seed(db: Db, channel: { id: string; sample: boolean }, messages: [string, string][]) {
+async function seed(
+  db: Db,
+  channel: { id: string; sample: boolean },
+  messages: [string, string][],
+  postedAt = new Date(),
+) {
   await db.query(
     "INSERT INTO channels (id, name, kind, is_member, is_sample) VALUES ($1, $1, 'public', true, $2)",
     [channel.id, channel.sample],
@@ -29,7 +34,7 @@ async function seed(db: Db, channel: { id: string; sample: boolean }, messages: 
   for (const [ts, text] of messages) {
     await db.query(
       "INSERT INTO messages (channel_id, ts, user_id, text, posted_at, source) VALUES ($1, $2, 'U1', $3, $4, 'incremental')",
-      [channel.id, ts, text, new Date(Number(ts) * 1000)],
+      [channel.id, ts, text, postedAt],
     );
   }
 }
@@ -73,6 +78,18 @@ test("분류되지 않은 메시지만 분류하고 긴급 메시지마다 알�
   );
   const alerts = await db.query("SELECT ts FROM alerts");
   assert.deepEqual(alerts.rows, [{ ts: "1794787200.000100" }]);
+
+  // 과거 수집으로 들어온 오래된 긴급 메시지는 분류만 하고 알리지 않는다.
+  await seed(
+    db,
+    { id: "C2", sample: false },
+    [["1794700000.000100", "어제 결제 서버 장애가 있었습니다"]],
+    new Date(Date.now() - 2 * 3_600_000),
+  );
+  await classifyPass(db, config());
+  const old = await db.query("SELECT route FROM classifications WHERE channel_id = 'C2'");
+  assert.deepEqual(old.rows, [{ route: "notify_now" }]);
+  assert.equal((await db.query("SELECT count(*)::int AS n FROM alerts")).rows[0].n, 1);
   await db.end();
 });
 
