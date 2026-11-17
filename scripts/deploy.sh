@@ -33,9 +33,21 @@ g() { git --git-dir="$MIRROR" "$@"; }
 short() { printf '%.7s' "${1:-none}"; }
 say() { if [ "$AUTO" = 0 ]; then echo "$@"; fi; }
 log() { printf '%s %s->%s %s\n' "$(date '+%F %T')" "$(short "$CUR")" "$(short "$SHA")" "$1" >> "$STATE/log"; }
+defer_if_stopped() {
+  if [ "$AUTO" = 1 ] && [ -n "$CUR" ]; then
+    local running
+    running="$(docker ps -q --filter label=com.docker.compose.project=orbit)" || exit 1
+    [ -n "$running" ] || exit 0
+  fi
+}
 compose() {  # 태그, compose 인자...
   local tag="$1"
   shift
+  if [ "${1:-}" = up ]; then defer_if_stopped; fi
+  if [ -x "$RELEASES/$tag/scripts/compose.sh" ]; then
+    ORBIT_IMAGE_TAG="$tag" "$RELEASES/$tag/scripts/compose.sh" "$@"
+    return
+  fi
   ORBIT_IMAGE_TAG="$tag" docker compose --env-file "$ENV_FILE" -p orbit -f "$RELEASES/$tag/compose.yaml" "$@"
 }
 app() {  # 태그, DB 이름, 명령...
@@ -55,6 +67,8 @@ if [ "${1:-}" = status ]; then
 fi
 
 [ -d "$MIRROR" ] && [ -f "$ENV_FILE" ] || { echo "deploy: 먼저 scripts/mac/service.sh install 을 실행하세요." >&2; exit 2; }
+
+defer_if_stopped
 
 LOCK="$STATE/deploy.lock"
 if ! mkdir "$LOCK" 2>/dev/null; then
@@ -119,8 +133,21 @@ if ! docker build -q -t "orbit:$SHA" "$REL" > "$STATE/build.log" 2>&1; then
 fi
 
 PG_PASSWORD="$(sed -n 's/^ORBIT_PG_PASSWORD=//p' "$ENV_FILE")"
+if [ -x "$REL/scripts/compose.sh" ]; then
+  if [ -z "$CUR" ]; then
+    compose "$SHA" prepare --init > "$STATE/qm.log" 2>&1 || fail qm-config
+  else
+    compose "$SHA" prepare > "$STATE/qm.log" 2>&1 || fail qm-config
+  fi
+fi
 docker network inspect qm-orbit >/dev/null 2>&1 || docker network create qm-orbit >/dev/null
-compose "$SHA" up -d --wait --wait-timeout 90 orbit-pg >/dev/null 2>&1 || fail postgres
+db_services=(orbit-pg)
+[ ! -x "$REL/scripts/compose.sh" ] || db_services+=(qm-pg)
+compose "$SHA" up -d --wait --wait-timeout 90 "${db_services[@]}" >/dev/null 2>&1 || fail postgres
+
+if [ -n "$CUR" ] && ! g diff --quiet "$CUR" "$SHA" -- qm compose.yaml scripts/qm_env.mjs; then
+  "$REL/scripts/backup.sh" >/dev/null || fail qm-backup
+fi
 
 rehearse() {  # 방금 뜬 백업의 사본에 마이그레이션을 먼저 적용하고, 새 코드와 지금 코드가 그 스키마에서 도는지 본다.
   local dump="$1/orbit.dump"
@@ -151,21 +178,13 @@ healthy() {  # 90초 안에 healthy 가 되고, 그 뒤 20초 동안 재시작 �
     [ -z "$(compose "$1" ps -q --status exited --status restarting --status dead)" ]
 }
 
-sync_qm() {  # qm/ 이 바뀐 배포에서만 QM 을 다시 올린다. 실패하면 이전 고정 버전으로 되돌린다.
-  if [ -n "$CUR" ] && g diff --quiet "$CUR" "$SHA" -- qm; then return 0; fi
-  "$REL/scripts/backup.sh" >/dev/null || return 1
-  if "$REL/scripts/qm.sh" up > "$STATE/qm.log" 2>&1; then return 0; fi
-  if [ -n "$CUR" ]; then "$RELEASES/$CUR/scripts/qm.sh" up >> "$STATE/qm.log" 2>&1 || true; fi
-  return 1
-}
-
 say "교체: $(short "$CUR") -> $(short "$SHA")"
 if healthy "$SHA"; then
   printf '%s\n' "$SHA" > "$STATE/current.tmp"
   mv "$STATE/current.tmp" "$STATE/current"
   ln -sfn "$REL" "$ORBIT_HOME/current"
   rm -f "$STATE/attempts" "$STATE/blocked"
-  if sync_qm; then log ok; else log "ok (qm-failed: state/qm.log)"; fi
+  log ok
   for old in "$RELEASES"/*; do
     tag="$(basename "$old")"
     if [ "$tag" != "$SHA" ] && [ "$tag" != "$CUR" ]; then
@@ -177,6 +196,7 @@ if healthy "$SHA"; then
   exit 0
 fi
 
+defer_if_stopped
 echo "$SHA" >> "$STATE/failed"
 if [ -z "$CUR" ]; then
   log failed:health
@@ -184,9 +204,20 @@ if [ -z "$CUR" ]; then
   exit 1
 fi
 echo "deploy: 헬스체크 실패. $(short "$CUR") 로 되돌립니다." >&2
+if [ ! -x "$RELEASES/$CUR/scripts/compose.sh" ]; then
+  compose "$SHA" stop qm-core qm-pg >/dev/null 2>&1 &&
+    compose "$SHA" rm -f qm-core qm-pg >/dev/null 2>&1 &&
+    env -u OPENAI_API_KEY -u ANTHROPIC_API_KEY -u OPENROUTER_API_KEY "$RELEASES/$CUR/scripts/qm.sh" up >> "$STATE/qm.log" 2>&1 || {
+      log rollback-failed
+      echo "deploy: 기존 QM 복원 실패. state/qm.log를 확인하세요." >&2
+      exit 2
+    }
+fi
 if healthy "$CUR"; then
-  log rolled-back
-  exit 1
+  if docker exec qm-orbit-core node -e 'Promise.all([8080, 8000].map(p => fetch(`http://127.0.0.1:${p}/healthz`))).then(rs => process.exit(rs.every(r => r.ok) ? 0 : 1), () => process.exit(1))'; then
+    log rolled-back
+    exit 1
+  fi
 fi
 log rollback-failed
 echo "deploy: 되돌리기도 실패했습니다. scripts/status.sh 를 확인하세요." >&2

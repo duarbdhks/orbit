@@ -10,9 +10,11 @@ export ORBIT_HOME
 REPO="${ORBIT_REPO:-duarbdhks/orbit}"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd -P)"
 AGENTS="$HOME/Library/LaunchAgents"
-JOBS="deploy watchdog"
+JOBS="deploy backup"
 
 plist() {  # 작업 이름
+  local interval=300
+  [ "$1" != backup ] || interval=3600
   cat <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -23,7 +25,7 @@ plist() {  # 작업 이름
   <array>
     <string>$ORBIT_HOME/current/scripts/mac/orbit-$1</string>
   </array>
-  <key>StartInterval</key><integer>300</integer>
+  <key>StartInterval</key><integer>$interval</integer>
   <key>RunAtLoad</key><true/>
   <key>StandardOutPath</key><string>$ORBIT_HOME/state/launchd-$1.log</string>
   <key>StandardErrorPath</key><string>$ORBIT_HOME/state/launchd-$1.log</string>
@@ -52,6 +54,8 @@ case "${1:-}" in
       git -c credential.helper='!gh auth git-credential' clone --quiet --mirror "https://github.com/$REPO.git" "$ORBIT_HOME/state/orbit.git"
       git --git-dir="$ORBIT_HOME/state/orbit.git" config credential.helper '!gh auth git-credential'
     fi
+    launchctl bootout "gui/$(id -u)/com.yeumgw.orbit.watchdog" 2>/dev/null || true
+    rm -f "$AGENTS/com.yeumgw.orbit.watchdog.plist"
     "$ROOT/scripts/deploy.sh"
     for job in $JOBS; do
       plist "$job" > "$AGENTS/com.yeumgw.orbit.$job.plist"
@@ -61,7 +65,7 @@ case "${1:-}" in
     echo "설치 완료. scripts/status.sh 로 확인하세요."
     ;;
   uninstall)
-    for job in $JOBS; do
+    for job in $JOBS watchdog; do
       launchctl bootout "gui/$(id -u)/com.yeumgw.orbit.$job" 2>/dev/null || true
       rm -f "$AGENTS/com.yeumgw.orbit.$job.plist"
     done

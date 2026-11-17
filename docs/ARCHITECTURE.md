@@ -26,7 +26,7 @@ Slack DM <──(Bot 토큰, Socket Mode)── QM core (Codex 구독) ──> q
 | `orbit-pg` | 원문과 업무 지식 | |
 | `orbit-runner` | GitHub Actions CI | 없음. 호스트 폴더와 docker.sock 을 마운트하지 않는다. 공개 저장소라 PR 생성은 Collaborators only, 포크 PR 실행은 승인 필수로 둔다 |
 
-Orbit 컨테이너와 QM 컨테이너는 Docker 네트워크 `qm-orbit`에서 만난다. `orbit-pg`는 그 네트워크에 붙지 않는다. Orbit은 호스트 포트를 열지 않는다.
+운영 5개는 루트 `compose.yaml`의 `orbit` 프로젝트, CI 러너는 `compose.ci.yaml`의 `orbit-ci` 프로젝트에 속한다. Orbit과 QM은 Docker 네트워크 `qm-orbit`에서 만난다. `orbit-pg`는 그 네트워크에 붙지 않는다. 러너는 별도 네트워크에 있고 운영 배포와 함께 재생성되지 않는다. Orbit은 호스트 포트를 열지 않는다.
 
 ## QM을 고치지 않고 붙이는 지점
 
@@ -58,3 +58,5 @@ Orbit 컨테이너와 QM 컨테이너는 Docker 네트워크 `qm-orbit`에서 �
 ## 배포
 
 launchd 작업 `com.yeumgw.orbit.deploy`가 300초마다 `scripts/deploy.sh --auto`를 실행한다. CI check-run `gate`가 success인 main 커밋만 올린다. 순서는 이미지 빌드, (마이그레이션이 있으면) 백업과 사본 리허설과 적용, `selfcheck`, 교체, 헬스체크다. 헬스체크가 실패하면 이전 이미지로 되돌린다. CI 러너는 배포 권한을 갖지 않는다.
+
+컨테이너 재시작은 Docker의 `unless-stopped` 정책만 맡는다. 운영 그룹 전체를 중지하면 자동 배포도 보류한다. 백업은 별도 `com.yeumgw.orbit.backup` 작업, 수집 지연과 컨테이너 상태 조회는 `scripts/status.sh`가 맡는다.

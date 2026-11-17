@@ -4,7 +4,7 @@
 
 ## 백업에 들어 있는 것
 
-`scripts/backup.sh`가 `~/Library/Application Support/Orbit/backups/<시각>/`에 쓴다. watchdog이 하루 한 번, 배포기가 마이그레이션과 QM 변경 전에 실행한다. 7일 지난 백업은 지운다.
+`scripts/backup.sh`가 `~/Library/Application Support/Orbit/backups/<시각>/`에 쓴다. launchd의 `com.yeumgw.orbit.backup`이 1시간마다 확인해 하루 한 번 실행하고, 배포기는 마이그레이션과 QM 변경 전에 실행한다. 두 DB가 모두 실행 중일 때만 완전한 백업을 만들고 7일 지난 백업을 지운다. DB 중지 중에는 기존 백업을 보존한다.
 
 | 파일 | 내용 |
 |---|---|
@@ -52,7 +52,7 @@ main에 있는 커밋만 받는다. 다음 자동 배포가 다시 main의 최�
 
 ## QM 버전을 올렸다가 되돌리기
 
-배포기는 `qm/`이 바뀐 배포에서 백업을 뜨고 `qm up`을 실행한다. 실패하면 이전 고정 버전으로 `qm up`을 다시 한다. 이전 버전 core가 새 QM 스키마에서 뜨지 않으면 `qm.dump`로 QM DB를 되돌려야 하고, 백업 뒤의 QM 대화와 기억을 잃는다.
+배포기는 QM 설정이나 운영 Compose가 바뀌면 백업을 뜨고 새 고정 이미지로 Compose를 갱신한다. 헬스체크에 실패하면 이전 릴리스의 Compose로 되돌린다. 이전 버전 core가 새 QM 스키마에서 뜨지 않으면 `qm.dump`로 QM DB를 되돌려야 하고, 백업 뒤의 QM 대화와 기억을 잃는다.
 
 ```bash
 docker stop qm-orbit-core

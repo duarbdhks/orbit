@@ -2,6 +2,51 @@
 name: orbit
 
 services:
+  qm-pg:
+    image: pgvector/pgvector:0.8.1-pg16@sha256:33198da2828a14c30348d2ccb4750833d5ed9a44c88d840a0e523d7417120337
+    container_name: qm-orbit-pg
+    restart: unless-stopped
+    env_file:
+      - path: "${QM_RUNTIME_DIR:?}/pg.env"
+        format: raw
+    volumes:
+      - qm-pgdata:/var/lib/postgresql/data
+    networks:
+      qm:
+        aliases: [pg]
+    labels:
+      qm.org: orbit
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "postgres", "-d", "qm"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  qm-core:
+    image: ${QM_CORE_IMAGE:?}
+    platform: linux/amd64
+    container_name: qm-orbit-core
+    restart: unless-stopped
+    env_file:
+      - path: "${QM_RUNTIME_DIR:?}/core.env"
+        format: raw
+    volumes:
+      - qm-coredata:/data
+    networks:
+      qm:
+        aliases: [core, qm-orbit-core.internal]
+    ports: ["18080:8080", "127.0.0.1:18082:8000"]
+    labels:
+      qm.org: orbit
+    depends_on:
+      qm-pg:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", 'fetch("http://127.0.0.1:8000/healthz").then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))']
+      interval: 5s
+      timeout: 3s
+      retries: 18
+
   orbit-pg:
     image: pgvector/pgvector:0.8.1-pg16@sha256:33198da2828a14c30348d2ccb4750833d5ed9a44c88d840a0e523d7417120337
     container_name: orbit-pg
@@ -65,3 +110,10 @@ networks:
 volumes:
   orbit-pgdata:
     name: orbit-pgdata
+    external: true
+  qm-pgdata:
+    name: qm-orbit-pgdata
+    external: true
+  qm-coredata:
+    name: qm-orbit-coredata
+    external: true
