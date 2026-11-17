@@ -16,7 +16,14 @@ export interface BriefingInput {
   items: BriefingItem[];
 }
 
-const SECTIONS = ["결론", "장애와 리스크", "일정과 정책 변경", "진행", "미해결 질문", "내 스레드"] as const;
+const SECTIONS = {
+  결론: "✅",
+  "장애와 리스크": "⚠️",
+  "일정과 정책 변경": "🗓️",
+  진행: "📈",
+  "미해결 질문": "❓",
+  "내 스레드": "💬",
+} as const;
 const STATE: Record<DecisionState, string> = {
   discussing: "논의 중",
   confirmed: "확정",
@@ -24,7 +31,7 @@ const STATE: Record<DecisionState, string> = {
   withdrawn: "철회",
 };
 
-function section(item: BriefingItem): (typeof SECTIONS)[number] {
+function section(item: BriefingItem): keyof typeof SECTIONS {
   if (item.awaits_owner || item.suggested_reply) return "내 스레드";
   if (item.kind === "decision") return item.decision_state === "discussing" ? "미해결 질문" : "결론";
   if (item.kind === "incident" || item.kind === "risk") return "장애와 리스크";
@@ -34,16 +41,26 @@ function section(item: BriefingItem): (typeof SECTIONS)[number] {
 }
 
 export function composeBriefing(input: BriefingInput): string {
-  const lines = [`[${input.kind === "weekly" ? "주간" : "일간"} 브리핑] ${input.status}`];
-  for (const name of SECTIONS) {
+  const period = input.kind === "weekly" ? "주간" : "일간";
+  if (input.items.length === 0) {
+    return `📭 이번 ${period} 브리핑에 담을 항목이 없어요. ${input.status}`;
+  }
+  const awaiting = input.items.filter((item) => item.awaits_owner).length;
+  const lines = [
+    awaiting > 0
+      ? `📬 이번 ${period} 브리핑에서 답장을 기다리는 항목은 ${awaiting}건이에요.`
+      : `📋 이번 ${period} 브리핑에 담을 항목은 ${input.items.length}건이에요.`,
+  ];
+  for (const [name, emoji] of Object.entries(SECTIONS)) {
     const items = input.items.filter((item) => section(item) === name);
     if (items.length === 0) continue;
-    lines.push("", `*${name}*`);
+    lines.push("", `## ${emoji} ${name}`);
     for (const item of items) {
       const state = item.decision_state ? `[${STATE[item.decision_state]}] ` : "";
       lines.push(`- ${state}${item.title}: ${item.summary} ${item.permalinks.join(" ")}`.trimEnd());
       if (item.suggested_reply) lines.push(`  답장 초안: ${item.suggested_reply}`);
     }
   }
+  lines.push("", "## 📡 수집 상태", input.status);
   return lines.join("\n");
 }
