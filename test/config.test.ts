@@ -16,3 +16,6 @@ test("잘못된 값은 시작할 때 거부한다", () => {
   assert.throws(() => loadConfig({ DATABASE_URL: "postgres://x", ORBIT_JEV_DAILY_BUDGET_USD: "-1" }));
   assert.throws(() => loadConfig({}));
 });
+
+import { test as t2 } from "node:test";
+t2("일부러 깨뜨린 검사", () => { throw new Error("gate must fail"); });
