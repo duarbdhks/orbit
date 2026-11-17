@@ -1,0 +1,168 @@
+{
+  "runtime": [
+    {
+      "input": "안녕",
+      "expected": "simple"
+    },
+    {
+      "input": "안녕하세요, 좋은 아침입니다",
+      "expected": "simple"
+    },
+    {
+      "input": "고마워!",
+      "expected": "simple"
+    },
+    {
+      "input": "수고했어요",
+      "expected": "simple"
+    },
+    {
+      "input": "지금 몇 시야?",
+      "expected": "simple"
+    },
+    {
+      "input": "오늘 회의 언제야?",
+      "expected": "simple"
+    },
+    {
+      "input": "내 스레드 몇 개 남았어?",
+      "expected": "simple"
+    },
+    {
+      "input": "어제 브리핑 보여줘",
+      "expected": "simple"
+    },
+    {
+      "input": "오늘 일정 알려줘",
+      "expected": "simple"
+    },
+    {
+      "input": "배포 채널 어디야?",
+      "expected": "simple"
+    },
+    {
+      "input": "이번 주 당직 누구야?",
+      "expected": "simple"
+    },
+    {
+      "input": "미확인 알림 몇 건 있어?",
+      "expected": "simple"
+    },
+    {
+      "input": "감사합니다~",
+      "expected": "simple"
+    },
+    {
+      "input": "어제 회의록 요약해줘",
+      "expected": "standard"
+    },
+    {
+      "input": "이 스레드에 답장 초안 써줘",
+      "expected": "standard"
+    },
+    {
+      "input": "내일 오전 10시에 리마인더 걸어줘",
+      "expected": "standard"
+    },
+    {
+      "input": "결제 채널 오늘 메시지 정리해줘",
+      "expected": "standard"
+    },
+    {
+      "input": "이번 주 결정된 것만 목록으로 뽑아줘",
+      "expected": "standard"
+    },
+    {
+      "input": "출시 공지 문구 다듬어줘",
+      "expected": "standard"
+    },
+    {
+      "input": "배포 일정 바뀐 거 브리핑에 넣어줘",
+      "expected": "standard"
+    },
+    {
+      "input": "디자인팀에 보낼 메시지 초안 만들어줘",
+      "expected": "standard"
+    },
+    {
+      "input": "지난번 브리핑 다시 보내줘",
+      "expected": "standard"
+    },
+    {
+      "input": "고객 문의 스레드 세 개 요약해서 보여줘",
+      "expected": "standard"
+    },
+    {
+      "input": "QA 일정 표로 만들어줘",
+      "expected": "standard"
+    },
+    {
+      "input": "이 내용 영어로 번역해줘",
+      "expected": "standard"
+    },
+    {
+      "input": "오늘 들어온 알림을 중요도 순으로 정렬해줘",
+      "expected": "standard"
+    },
+    {
+      "input": "주간 브리핑 초안 작성해줘",
+      "expected": "standard"
+    },
+    {
+      "input": "지난주 결제 장애 원인 분석해줘",
+      "expected": "complex"
+    },
+    {
+      "input": "두 팀의 출시 일정이 충돌하는지 확인해줘",
+      "expected": "complex"
+    },
+    {
+      "input": "A안과 B안 비용 비교해서 추천해줘",
+      "expected": "complex"
+    },
+    {
+      "input": "이번 달 결정 사항이 서로 모순되는지 검토해줘",
+      "expected": "complex"
+    },
+    {
+      "input": "온보딩 이탈 이유를 슬랙 대화에서 조사해줘",
+      "expected": "complex"
+    },
+    {
+      "input": "신규 요금제 정책이 기존 공지와 맞는지 검증해줘",
+      "expected": "complex"
+    },
+    {
+      "input": "경쟁사 최신 가격 정책 리서치해줘",
+      "expected": "complex"
+    },
+    {
+      "input": "로그인 오류가 반복되는 이유를 채널별로 찾아서 정리해줘",
+      "expected": "complex"
+    },
+    {
+      "input": "다음 주 월요일 임원 보고에 쓸 자료를 준비해야 해. 지난 한 달 동안 제품, 결제, 운영 채널에서 나온 결정과 일정 변경을 모아서 무엇이 확정됐고 무엇이 아직 논의 중인지 나누고, 각 항목마다 근거가 된 메시지 링크를 붙여서 한 페이지로 만들어줘. 같은 일정이 서로 다르게 언급된 곳이 있으면 따로 표시해줘.",
+      "expected": "complex"
+    },
+    {
+      "input": "배포 후 응답 지연이 늘어난 원인 찾아줘",
+      "expected": "complex"
+    },
+    {
+      "input": "세 가지 아키텍처 안의 장단점을 비교해줘",
+      "expected": "complex"
+    },
+    {
+      "input": "고객 이탈 데이터 분석해서 가설 세워줘",
+      "expected": "complex"
+    },
+    {
+      "input": "왜 이번 스프린트가 계속 밀리는지 알아봐줘",
+      "expected": "complex"
+    },
+    {
+      "input": "보안 점검 결과가 사내 정책과 충돌하는 부분 검토해줘",
+      "expected": "complex"
+    }
+  ]
+}
