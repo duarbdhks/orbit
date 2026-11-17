@@ -137,6 +137,8 @@ if [ -n "$pending" ]; then
   # 실패하면 Postgres 가 트랜잭션을 되돌린다. 운영 DB 를 백업으로 덮어쓰지 않는다.
   app "$SHA" orbit migrate > /dev/null 2>> "$STATE/rehearsal.log" || fail migrate
 fi
+# 마이그레이션이 없는 배포에서도 새 코드의 SQL 이 운영 스키마와 맞는지 교체 전에 본다.
+app "$SHA" orbit selfcheck > "$STATE/selfcheck.log" 2>&1 || fail selfcheck
 
 healthy() {  # 90초 안에 healthy 가 되고, 그 뒤 20초 동안 재시작 없이 유지된다.
   local before
