@@ -69,10 +69,16 @@ shell_syntax() {
   for f in scripts/*.sh scripts/mac/*.sh; do bash -n "$f" || return 1; done
 }
 
+compose_config() {
+  ORBIT_HOME=/tmp ORBIT_IMAGE_TAG=gate ORBIT_PG_PASSWORD=gate docker compose -f compose.yaml config -q
+}
+
 echo "ci_gate: $SHA"
 # gitleaks는 의존성과 테스트 산출물이 생기기 전의 트리를 본다.
 step gitleaks gitleaks_scan
 step shell shell_syntax
+# CI 러너에는 Docker 가 없다. 로컬 gate 가 compose 파일을 검사한다.
+if docker compose version >/dev/null 2>&1; then step compose compose_config; fi
 step deps npm ci --no-audit --no-fund
 step typecheck npm run -s typecheck
 step lint npm run -s lint
