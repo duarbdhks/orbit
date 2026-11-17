@@ -10,8 +10,7 @@
 
 ```bash
 scripts/ci_runner.sh up          # CI 러너 orbit-ci-mac
-scripts/qm.sh up                 # QM. qm.env 가 먼저 있어야 한다 (아래 "QM 비밀값")
-scripts/mac/service.sh install   # env 파일 틀, 저장소 mirror, 첫 배포, launchd 작업 2개
+scripts/mac/service.sh install   # qm.env가 먼저 필요하다. 두 DB와 QM, Orbit을 함께 배포한다.
 scripts/qm_register.sh           # QM 에 Orbit MCP 등록
 scripts/status.sh
 ```
@@ -69,16 +68,39 @@ QM 설정의 Decision rules에서 `turn_start` 규칙을 만든다. provider는 
 | 복원 확인 | `scripts/restore_drill.sh` |
 | 자동 실행 끄기와 켜기 | `scripts/mac/service.sh uninstall`, `install` |
 | QM 중지와 시작 | `scripts/qm.sh down`, `scripts/qm.sh up` |
-| Orbit 중지 | `scripts/mac/service.sh uninstall` 뒤 `docker stop orbit-api orbit-collector orbit-pg` |
+| 운영 전체 중지와 시작 | `scripts/compose.sh stop`, `scripts/compose.sh start --wait` 또는 Docker Desktop의 `orbit` 그룹 |
+| CI 중지와 시작 | `scripts/ci_runner.sh down`, `scripts/ci_runner.sh up` |
 | CI와 같은 검사 | `scripts/ci_gate.sh` |
 | 샘플 데이터로 끝까지 확인 | `scripts/probe/sample_e2e.mjs` 머리말 참고 |
 
 ## 재부팅과 절전
 
-- 컨테이너는 `restart: unless-stopped`라서 Docker Desktop이 뜨면 함께 뜬다.
-- launchd 작업은 로그인하면 시작한다. Docker가 아직 없으면 Docker Desktop을 띄우고 다음 주기를 기다린다.
+- Docker Desktop에는 운영 5개인 `orbit`과 러너 1개인 `orbit-ci`가 보인다. 운영 중지는 CI에 영향을 주지 않는다.
+- 컨테이너는 `restart: unless-stopped`다. 실행 중이던 컨테이너는 Docker Desktop이 뜨면 함께 뜨고, 직접 중지한 컨테이너는 계속 꺼져 있다.
+- 자동 배포는 운영 그룹 전체가 꺼져 있으면 보류한다. 다시 시작하면 다음 5분 주기에 밀린 배포를 진행한다. 수동 `scripts/deploy.sh`는 그룹을 시작할 수 있다.
+- launchd는 배포를 300초마다 실행하고, 백업 필요 여부를 1시간마다 확인해 하루 한 번 완전한 백업을 만든다. DB 중지 중에는 백업과 보관 기간 정리를 건너뛴다. 컨테이너를 켜는 watchdog은 없다.
 - 절전에서 깨어나면 수집기가 마지막으로 수집한 시각부터 지금까지를 다시 읽어 빈 구간을 메운다.
 
 ## QM 올리기
 
-`qm/package.json`의 `@yc-software/qm` 버전만 바꾸고 `qm/`에서 `npm install`로 lockfile을 갱신한 PR을 따로 낸다. 배포기가 백업을 뜨고 `qm up`을 실행한다. 되돌리는 법은 `docs/RECOVERY.md`에 있다.
+`qm/package.json`의 `@yc-software/qm` 버전만 바꾸고 `qm/`에서 `npm install`로 lockfile을 갱신한 PR을 따로 낸다. 배포기가 백업을 뜨고 고정 CLI의 이미지와 설정을 Compose로 반영한다. `scripts/qm_env.mjs`는 QM 0.1.18의 환경 계약을 재사용하므로 업그레이드 전에 새 CLI와 환경 동일성을 확인한다. 되돌리는 법은 `docs/RECOVERY.md`에 있다.
+
+## 기존 개별 컨테이너를 Compose로 전환하기
+
+기존 `qm-orbit-*`와 `orbit-runner`는 Compose가 그대로 인수할 수 없다. 전환 커밋의 CI가 통과한 뒤 자동 작업을 내리고 백업과 복원 검사를 한다. 운영 전환 중에는 QM 대화가 잠시 중지된다.
+
+```bash
+scripts/mac/service.sh uninstall
+scripts/backup.sh
+scripts/restore_drill.sh
+scripts/compose.sh prepare
+docker stop qm-orbit-core qm-orbit-pg
+docker rm qm-orbit-core qm-orbit-pg
+scripts/deploy.sh
+scripts/probe/qm_reach.sh
+scripts/mac/service.sh install
+scripts/ci_runner.sh down
+scripts/ci_runner.sh up
+```
+
+전환은 컨테이너만 교체한다. `orbit-pgdata`, `qm-orbit-pgdata`, `qm-orbit-coredata`와 QM 상태 파일을 삭제하지 않는다. 기존 볼륨이나 QM DB 비밀번호가 누락되면 배포가 중단된다. 초기 설치만 `prepare --init`으로 외부 볼륨을 만든다. QM 환경은 설정·CLI·렌더러 내용으로 구분한 `ORBIT_HOME/state/qm/`에 권한 `0600`으로 생성되며 저장소와 이미지에는 넣지 않는다.

@@ -71,7 +71,9 @@ shell_syntax() {
 
 compose_config() {
   mkdir -p "$ROOT/home/env" && : > "$ROOT/home/env/orbit.env" && : > "$ROOT/home/env/collector.env" || return 1
-  ORBIT_HOME="$ROOT/home" ORBIT_IMAGE_TAG=gate ORBIT_PG_PASSWORD=gate docker compose -f compose.yaml config -q
+  mkdir -p "$ROOT/home/qm" && : > "$ROOT/home/qm/core.env" && : > "$ROOT/home/qm/pg.env" || return 1
+  ORBIT_HOME="$ROOT/home" ORBIT_IMAGE_TAG=gate ORBIT_PG_PASSWORD=gate QM_RUNTIME_DIR="$ROOT/home/qm" QM_CORE_IMAGE=qm:gate docker compose -f compose.yaml config -q &&
+    docker compose -f compose.ci.yaml config -q
 }
 
 echo "ci_gate: $SHA"
@@ -83,9 +85,9 @@ if docker compose version >/dev/null 2>&1; then step compose compose_config; fi
 step deps npm ci --no-audit --no-fund
 step typecheck npm run -s typecheck
 step lint npm run -s lint
+step qmcheck qm_check
 step test npm test
 step audit npm audit --audit-level=high
-step qmcheck qm_check
 
 if [ -n "$FAILED" ]; then
   echo "ci_gate: 실패 -$FAILED"

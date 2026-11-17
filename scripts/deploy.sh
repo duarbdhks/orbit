@@ -36,6 +36,10 @@ log() { printf '%s %s->%s %s\n' "$(date '+%F %T')" "$(short "$CUR")" "$(short "$
 compose() {  # 태그, compose 인자...
   local tag="$1"
   shift
+  if [ -x "$RELEASES/$tag/scripts/compose.sh" ]; then
+    ORBIT_IMAGE_TAG="$tag" "$RELEASES/$tag/scripts/compose.sh" "$@"
+    return
+  fi
   ORBIT_IMAGE_TAG="$tag" docker compose --env-file "$ENV_FILE" -p orbit -f "$RELEASES/$tag/compose.yaml" "$@"
 }
 app() {  # 태그, DB 이름, 명령...
@@ -55,6 +59,11 @@ if [ "${1:-}" = status ]; then
 fi
 
 [ -d "$MIRROR" ] && [ -f "$ENV_FILE" ] || { echo "deploy: 먼저 scripts/mac/service.sh install 을 실행하세요." >&2; exit 2; }
+
+if [ "$AUTO" = 1 ] && [ -n "$CUR" ]; then
+  running="$(docker ps -q --filter label=com.docker.compose.project=orbit)" || exit 1
+  [ -n "$running" ] || exit 0
+fi
 
 LOCK="$STATE/deploy.lock"
 if ! mkdir "$LOCK" 2>/dev/null; then
@@ -119,8 +128,21 @@ if ! docker build -q -t "orbit:$SHA" "$REL" > "$STATE/build.log" 2>&1; then
 fi
 
 PG_PASSWORD="$(sed -n 's/^ORBIT_PG_PASSWORD=//p' "$ENV_FILE")"
+if [ -x "$REL/scripts/compose.sh" ]; then
+  if [ -z "$CUR" ]; then
+    compose "$SHA" prepare --init > "$STATE/qm.log" 2>&1 || fail qm-config
+  else
+    compose "$SHA" prepare > "$STATE/qm.log" 2>&1 || fail qm-config
+  fi
+fi
 docker network inspect qm-orbit >/dev/null 2>&1 || docker network create qm-orbit >/dev/null
-compose "$SHA" up -d --wait --wait-timeout 90 orbit-pg >/dev/null 2>&1 || fail postgres
+db_services=(orbit-pg)
+[ ! -x "$REL/scripts/compose.sh" ] || db_services+=(qm-pg)
+compose "$SHA" up -d --wait --wait-timeout 90 "${db_services[@]}" >/dev/null 2>&1 || fail postgres
+
+if [ -n "$CUR" ] && ! g diff --quiet "$CUR" "$SHA" -- qm compose.yaml scripts/qm_env.mjs; then
+  "$REL/scripts/backup.sh" >/dev/null || fail qm-backup
+fi
 
 rehearse() {  # 방금 뜬 백업의 사본에 마이그레이션을 먼저 적용하고, 새 코드와 지금 코드가 그 스키마에서 도는지 본다.
   local dump="$1/orbit.dump"
@@ -151,21 +173,13 @@ healthy() {  # 90초 안에 healthy 가 되고, 그 뒤 20초 동안 재시작 �
     [ -z "$(compose "$1" ps -q --status exited --status restarting --status dead)" ]
 }
 
-sync_qm() {  # qm/ 이 바뀐 배포에서만 QM 을 다시 올린다. 실패하면 이전 고정 버전으로 되돌린다.
-  if [ -n "$CUR" ] && g diff --quiet "$CUR" "$SHA" -- qm; then return 0; fi
-  "$REL/scripts/backup.sh" >/dev/null || return 1
-  if "$REL/scripts/qm.sh" up > "$STATE/qm.log" 2>&1; then return 0; fi
-  if [ -n "$CUR" ]; then "$RELEASES/$CUR/scripts/qm.sh" up >> "$STATE/qm.log" 2>&1 || true; fi
-  return 1
-}
-
 say "교체: $(short "$CUR") -> $(short "$SHA")"
 if healthy "$SHA"; then
   printf '%s\n' "$SHA" > "$STATE/current.tmp"
   mv "$STATE/current.tmp" "$STATE/current"
   ln -sfn "$REL" "$ORBIT_HOME/current"
   rm -f "$STATE/attempts" "$STATE/blocked"
-  if sync_qm; then log ok; else log "ok (qm-failed: state/qm.log)"; fi
+  log ok
   for old in "$RELEASES"/*; do
     tag="$(basename "$old")"
     if [ "$tag" != "$SHA" ] && [ "$tag" != "$CUR" ]; then

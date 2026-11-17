@@ -5,7 +5,21 @@
 set -euo pipefail
 
 ORBIT_HOME="${ORBIT_HOME:-$HOME/Library/Application Support/Orbit}"
-QM_DIR="$(cd "$(dirname "$0")/../qm" && pwd)"
+export ORBIT_HOME
+ROOT="$(cd "$(dirname "$0")/.." && pwd -P)"
+QM_DIR="$ROOT/qm"
+
+case "${1:-}" in
+  up)
+    [ "$#" = 1 ] || { echo "qm: up의 추가 옵션은 지원하지 않습니다." >&2; exit 2; }
+    "$ROOT/scripts/compose.sh" prepare
+    exec "$ROOT/scripts/compose.sh" up -d --wait --wait-timeout 120 qm-pg qm-core
+    ;;
+  down)
+    [ "$#" = 1 ] || { echo "qm: down은 데이터 삭제 옵션을 받지 않습니다." >&2; exit 2; }
+    exec "$ROOT/scripts/compose.sh" stop qm-core qm-pg
+    ;;
+esac
 
 [ -d "$QM_DIR/node_modules/@yc-software/qm" ] || npm ci --prefix "$QM_DIR" --no-audit --no-fund >/dev/null
 cd "$QM_DIR"

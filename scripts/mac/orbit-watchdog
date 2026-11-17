@@ -1,3 +1,0 @@
-#!/bin/bash
-# launchd 가 직접 실행한다. 이 파일 이름이 macOS 설정의 백그라운드 항목 이름으로 보인다.
-exec "$(dirname "$0")/agent.sh" watchdog
