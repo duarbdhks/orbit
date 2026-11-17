@@ -107,7 +107,8 @@ fi
 REL="$RELEASES/$SHA"
 rm -rf "$REL"
 mkdir -p "$REL"
-g archive "$SHA" | tar -x -C "$REL"
+# 이미지 안의 node 사용자가 읽을 수 있어야 한다. 이 스크립트의 umask 077 로 풀면 root 만 읽는 파일이 COPY 된다.
+(umask 022 && g archive "$SHA" | tar -x -C "$REL")
 
 docker pull -q "$(sed -n 's/^FROM //p' "$REL/Dockerfile" | head -n 1)" >/dev/null 2>&1 || transient base-image
 if ! docker build -q -t "orbit:$SHA" "$REL" > "$STATE/build.log" 2>&1; then
