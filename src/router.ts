@@ -77,7 +77,7 @@ const STATUS =
 const SUMMARY = /요약|정리|초안|작성|만들|다듬|번역|리마인더|정렬|summari|summary|draft|translat/;
 const EXTRACTION = /추출|뽑|목록|찾|모아|모으|검색|\b(extract|find|search|list)\b/;
 const MULTIPLE =
-  /(?:여러|두|세|모든) (?:팀|채널|문서|출처)|채널별|DM.*채널|채널.*DM|조건.*시간순서|\b(multiple|across|parallel)\b/;
+  /(?:여러|두|세|모든) (?:팀|채널|문서|출처)|채널별|dm.*채널|채널.*dm|조건.*시간순서|\b(multiple|across|parallel)\b/;
 const EVIDENCE = /채널|스레드|문서|회의록|메시지|슬랙|근거|링크|\b(slack|thread|channel|document)\b/;
 const IMPORTANT =
   /보안|권한|개인정보|법률|정산|금액|프로덕션|운영 변경|\b(production|security|legal|financial)\b/;

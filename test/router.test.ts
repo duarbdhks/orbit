@@ -287,6 +287,7 @@ test("tierOf 는 실제 의도를 사용하고 인사나 조회 표현이 조사
   assert.equal(payment.runtime, "precise");
   assert.equal(payment.axes.evidence, "multiple");
   assert.equal(payment.axes.impact, "high");
+  assert.equal(tierOf("영훈님 DM과 pj-수픽 채널의 대화를 시간순으로 정리해줘").runtime, "precise");
   const { reasons, flags } = tierOf("웹에서 최신 문서를 각각 찾아 비교해줘");
   assert.deepEqual(reasons, ["investigation"]);
   assert.deepEqual(flags, { parallel: true, web_search: true, more_analysis: false, cache_reuse: false });

@@ -5,12 +5,15 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const RUNTIMES = {
-  simple: { modelId: "gpt-6-luna", effortLevel: "medium" },
+  simple: { modelId: "gpt-6-luna", effortLevel: "max" },
   extract: { modelId: "gpt-6-luna", effortLevel: "max" },
   standard: { modelId: "gpt-6.1-sol", effortLevel: "medium" },
   precise: { modelId: "gpt-6.1-terra", effortLevel: "max" },
   complex: { modelId: "gpt-6-astra", effortLevel: "high" },
 };
+
+export const ORG_RUNTIME = { ...RUNTIMES.standard, modelId: "codex/gpt-6.1-sol" };
+const GUIDANCE = "[Orbit 조회 환경] Slack 조회는 orbit MCP로 처리한다. 이 배포에는 명령 실행용 sandbox가 없으므로 대화 조회를 위해 execute나 sandbox 생성을 시도하지 않는다. pagination.complete가 true면 같은 필터를 반복 조회하지 않고 확인한 원문으로 답한다. coverage의 이전 스레드 누락 한계는 재조회로 해소되지 않으므로 최종 요약에 범위를 밝힌다.";
 
 export function runtimeRule(mode) {
   if (!["observe", "enforce", "off"].includes(mode)) throw new Error("Choose observe, enforce or off");
@@ -82,10 +85,12 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     ...(existing ? { expectedUpdatedAt: existing.updatedAt } : {}),
   });
   await api(`${scope}/decisions`, { provider: { id: "orbit", protocol: "decisions", baseUrl: "http://orbit-api", credential: "orbit-decisions" } });
-  await api(`${scope}/runtime`, RUNTIMES.standard);
+  await api(`${scope}/runtime`, ORG_RUNTIME);
   await api(`${scope}/subagent-runtime`, RUNTIMES.standard);
   await api(`${scope}/decisions`, { rule });
   await api(`${scope}/ack-emoji`, { names: ["orbit-working"] });
+  if (!(before.soul ?? "").includes("[Orbit 조회 환경]"))
+    await api(`${scope}/soul`, { content: [before.soul, GUIDANCE].filter(Boolean).join("\n\n"), expectedVersion: before.soulVersion ?? 0 });
   await api(`${scope}/feature-flags`, { featureName: "slack_loading_indicator", scopeId: `personal:${env.ORBIT_OWNER_PRINCIPAL}`, on: true });
   const after = await api(scope);
   console.log(JSON.stringify({ mode: after.decisions.rules.find((value) => value.id === rule.id)?.mode, runtime: after.runtime, subagentRuntime: after.subagentRuntime }));

@@ -67,7 +67,7 @@ node scripts/qm_configure.mjs observe
 node scripts/qm_configure.mjs enforce
 ```
 
-등록 조합은 Luna medium, Luna max, Sol medium, Terra max, Astra high다. 인사·설정 조회, 추출, 일반 요약, 여러 출처 대조, 원인 조사 순으로 구분한다. 잘못된 Jev 응답은 Sol 중심의 규칙으로 대체한다. `node scripts/qm_configure.mjs off`로 모델 선택 규칙을 중지할 수 있다. 예약 작업의 enabled 값은 바꾸지 않는다.
+등록 조합은 Luna max, Sol medium, Terra max, Astra high다. 인사·설정 조회와 단순 추출, 일반 요약, 여러 출처 대조, 원인 조사 순으로 구분한다. 실제 Slack 설정 조회에서 Luna medium이 답변을 마무리하지 못해 simple도 max로 보정했다. 잘못된 Jev 응답은 Sol 중심의 규칙으로 대체한다. `node scripts/qm_configure.mjs off`로 모델 선택 규칙을 중지할 수 있다. 예약 작업의 enabled 값은 바꾸지 않는다.
 
 ## 개인 DM 조회와 대기 표시
 
@@ -76,6 +76,8 @@ Collector 앱에 User scope `im:read`, `im:history`를 추가해 재설치한다
 사람을 지정하면 `find_people`로 후보를 확인한 뒤 `read_direct_messages`에 상대 ID와 ISO 8601 기간을 보낸다. 오늘은 한국 시간 00시부터 다음 날 00시 미만이다. DM은 최대 7일을 조회하고, 기간 전에 시작된 스레드 답글은 누락될 수 있다. `coverage.complete=false`를 전체 대화가 없다는 뜻으로 해석하면 안 된다.
 
 `assets/orbit/icon.png`는 프로필, `working.gif`는 `orbit-working` custom emoji로 등록한다. 등록 스크립트는 이 이름을 대기 리액션으로 설정하고 주인의 기존 스레드에 진행 카드를 켠다. 일반 DM의 대화 위치는 바꾸지 않는다. 이모지 선택이 실패하면 QM의 기본 `eyes` 리액션을 쓴다.
+
+QM 0.1.18은 대기 이모지 선택에도 모델을 호출하고 2초 안에 끝나지 않으면 `eyes`로 대체한다. 실환경에서는 이 대체 경로를 확인했다. GIF 등록만으로 일반 DM에서 항상 애니메이션이 표시된다고 보장하지 않는다. QM 본체는 수정하지 않는다.
 
 ## 일상 명령
 
