@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-const { runtimeRule, collectorEnv } = await import(
+const { runtimeRule, collectorEnv, ORG_RUNTIME } = await import(
   new URL("../scripts/qm_configure.mjs", import.meta.url).href
 );
 
@@ -21,7 +21,8 @@ test("QM rules choose Codex runtimes, keep a working fallback and start in obser
   const rule = runtimeRule("observe");
   assert.equal(rule.mode, "observe");
   assert.equal(rule.options[rule.onError].runtime.modelId, "gpt-6.1-sol");
-  assert.equal(rule.options.simple.runtime.effortLevel, "medium");
+  assert.equal(rule.options.simple.runtime.effortLevel, "max");
+  assert.equal(ORG_RUNTIME.modelId, "codex/gpt-6.1-sol");
   assert.equal(rule.options.precise.runtime.modelId, "gpt-6.1-terra");
   assert.equal(rule.options.precise.runtime.effortLevel, "max");
   assert.equal(rule.options.extract.runtime.effortLevel, "max");
