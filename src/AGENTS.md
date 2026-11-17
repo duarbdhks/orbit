@@ -7,24 +7,24 @@ Slack 메시지를 수집·분류하고, QM에 MCP 도구와 실행 경로 판�
 
 ## 주요 파일
 
-| 파일                         | 역할                                                 |
-| ---------------------------- | ---------------------------------------------------- |
-| `main.ts`, `server.ts`       | 명령 진입점과 Fastify 서버 구성                      |
-| `slack.ts`, `collector.ts`   | Slack API 응답 검증·직렬 요청과 수집·대조·보존 삭제  |
-| `classify.ts`, `research.ts` | 규칙 분류와 분류 결과 저장·긴급 알림 webhook 발송    |
-| `policy.ts`                  | 모델 전송 허용 채널, 메시지 가림과 permalink         |
-| `mcp.ts`                     | QM용 JSON-RPC 도구, 인증과 분석 결과 저장            |
-| `router.ts`, `jev.ts`        | QM 실행 경로와 메시지 route 판단, Jev 호출·예산 기록 |
-| `briefing.ts`                | 지식 항목을 브리핑 문자열로 구성                     |
-| `db.ts`, `sql.ts`            | Postgres 연결·마이그레이션·selfcheck와 SQL 문장 수집 |
-| `migrations-lint.ts`         | 추가 방식 마이그레이션 검사                          |
-| `sample.ts`, `eval.ts`       | 샘플 데이터 적재와 예측 평가 지표 계산               |
-| `config.ts`, `types.ts`      | 환경 설정 검증과 공통 도메인 타입                    |
+| 파일 | 역할 |
+|---|---|
+| `main.ts`, `server.ts` | 명령 진입점과 Fastify 서버 구성 |
+| `slack.ts`, `collector.ts` | Slack API 응답 검증·직렬 요청과 수집·대조·보존 삭제 |
+| `classify.ts`, `research.ts` | 규칙 분류와 분류 결과 저장·긴급 알림 webhook 발송 |
+| `policy.ts` | 모델 전송 허용 채널, 메시지 가림과 permalink |
+| `mcp.ts` | QM용 JSON-RPC 도구, 인증과 분석 결과 저장 |
+| `router.ts`, `jev.ts` | QM 실행 경로와 메시지 route 판단, Jev 호출·예산 기록 |
+| `briefing.ts` | 지식 항목을 브리핑 문자열로 구성 |
+| `db.ts`, `sql.ts` | Postgres 연결·마이그레이션·selfcheck와 SQL 문장 수집 |
+| `migrations-lint.ts` | 추가 방식 마이그레이션 검사 |
+| `sample.ts`, `eval.ts` | 샘플 데이터 적재와 예측 평가 지표 계산 |
+| `config.ts`, `types.ts` | 환경 설정 검증과 공통 도메인 타입 |
 
 ## 하위 디렉터리
 
-| 디렉터리            | 역할                                  |
-| ------------------- | ------------------------------------- |
+| 디렉터리 | 역할 |
+|---|---|
 | [db/](db/AGENTS.md) | 수집·분석·라우터별 이름 붙은 SQL 문장 |
 
 ## 작업할 때

@@ -7,11 +7,11 @@ Postgres에서 실행할 이름 붙은 SQL 문장을 기능별 `SQL` 객체로 �
 
 ## 주요 파일
 
-| 파일           | 역할과 호출자                                                                                                |
-| -------------- | ------------------------------------------------------------------------------------------------------------ |
-| `collector.ts` | 채널·메시지 upsert, 스레드 대조, 수집 상태·보존 삭제. `src/collector.ts`가 사용                              |
-| `research.ts`  | 분류·알림, 메시지 검색, 지식·근거·브리핑, 샘플 적재. `src/research.ts`, `src/mcp.ts`, `src/sample.ts`가 사용 |
-| `router.ts`    | Jev 사용량·라우터 판단 기록과 샘플 채널 조회. `src/jev.ts`, `src/router.ts`가 사용                           |
+| 파일 | 역할과 호출자 |
+|---|---|
+| `collector.ts` | 채널·메시지 upsert, 스레드 대조, 수집 상태·보존 삭제. `src/collector.ts`가 사용 |
+| `research.ts` | 분류·알림, 메시지 검색, 지식·근거·브리핑, 샘플 적재. `src/research.ts`, `src/mcp.ts`, `src/sample.ts`가 사용 |
+| `router.ts` | Jev 사용량·라우터 판단 기록과 샘플 채널 조회. `src/jev.ts`, `src/router.ts`가 사용 |
 
 ## 작업과 검증
 

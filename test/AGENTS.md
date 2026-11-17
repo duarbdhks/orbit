@@ -7,18 +7,18 @@ Node 내장 테스트와 임시 Postgres로 수집부터 분류, MCP, 브리핑,
 
 ## 주요 파일
 
-| 파일                                                | 역할                                                            |
-| --------------------------------------------------- | --------------------------------------------------------------- |
-| `run.ts`                                            | 임시 Postgres를 시작하고 `node --test`를 실행한 뒤 종료·정리    |
-| `helpers.ts`                                        | 호출마다 별도 DB를 만들고 기본적으로 마이그레이션 적용          |
-| `fake-slack.ts`                                     | 로컬 Slack API, 페이지 나눔, 채널 오류와 429 응답 모의          |
-| `collector.test.ts`                                 | 수집 재개·중복·수정·삭제·접근 상실·보존 기간 검증               |
-| `classify.test.ts`, `research.test.ts`              | 규칙 분류, 알림, webhook과 샘플 적재 검증                       |
-| `mcp.test.ts`, `briefing.test.ts`, `server.test.ts` | MCP 인증·제출·비공개 처리, 브리핑과 healthz 검증                |
-| `router.test.ts`, `jev.test.ts`                     | 라우터 모드, Jev 응답 검증·예산·사용량과 실패 시 규칙 대체 검증 |
-| `policy.test.ts`, `config.test.ts`                  | 모델 전송 허용·마스킹과 설정 기본값 검증                        |
-| `db.test.ts`, `migrations-lint.test.ts`             | 마이그레이션 적용·롤백·SQL selfcheck와 추가 전용 lint 검증      |
-| `eval.test.ts`, `eval-router.test.ts`               | 평가 집계와 라벨이 붙은 예시의 정확도 기준 검증                 |
+| 파일 | 역할 |
+|---|---|
+| `run.ts` | 임시 Postgres를 시작하고 `node --test`를 실행한 뒤 종료·정리 |
+| `helpers.ts` | 호출마다 별도 DB를 만들고 기본적으로 마이그레이션 적용 |
+| `fake-slack.ts` | 로컬 Slack API, 페이지 나눔, 채널 오류와 429 응답 모의 |
+| `collector.test.ts` | 수집 재개·중복·수정·삭제·접근 상실·보존 기간 검증 |
+| `classify.test.ts`, `research.test.ts` | 규칙 분류, 알림, webhook과 샘플 적재 검증 |
+| `mcp.test.ts`, `briefing.test.ts`, `server.test.ts` | MCP 인증·제출·비공개 처리, 브리핑과 healthz 검증 |
+| `router.test.ts`, `jev.test.ts` | 라우터 모드, Jev 응답 검증·예산·사용량과 실패 시 규칙 대체 검증 |
+| `policy.test.ts`, `config.test.ts` | 모델 전송 허용·마스킹과 설정 기본값 검증 |
+| `db.test.ts`, `migrations-lint.test.ts` | 마이그레이션 적용·롤백·SQL selfcheck와 추가 전용 lint 검증 |
+| `eval.test.ts`, `eval-router.test.ts` | 평가 집계와 라벨이 붙은 예시의 정확도 기준 검증 |
 
 ## 작업과 검증
 
