@@ -20,13 +20,15 @@ if [ $# -eq 0 ]; then
   cursor=""
   : > "$OUT.all"
   while :; do
-    slack conversations.list -d types=public_channel,private_channel -d exclude_archived=true -d limit=200 -d "cursor=$cursor" > /dev/null
+    code="$(slack conversations.list -d types=public_channel,private_channel -d exclude_archived=true -d limit=200 -d "cursor=$cursor")"
+    # shortcut: Retry-After 를 읽지 않고 30초를 쉰다, 프로브가 느려 불편하면 헤더 값을 쓴다. 채널 530개에서 약 12분 걸렸다.
+    if [ "$code" = 429 ]; then sleep 30; continue; fi
     node -e '
       const j = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"));
       if (!j.ok) { console.error("slack: " + j.error); process.exit(1); }
       for (const c of j.channels) console.log((c.is_private ? "private" : "public") + " " + (c.is_member ? "member" : "non-member"));
       console.error(j.response_metadata?.next_cursor ?? "");
-    ' "$OUT" >> "$OUT.all" 2> "$OUT.cursor"
+    ' "$OUT" >> "$OUT.all" 2> "$OUT.cursor" || { cat "$OUT.cursor" >&2; exit 1; }
     cursor="$(cat "$OUT.cursor")"
     [ -n "$cursor" ] || break
   done

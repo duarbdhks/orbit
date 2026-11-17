@@ -93,16 +93,24 @@ export function createCollector(db: Db, slack: Slack, config: Config): { tick(no
     }
   }
 
-  async function discover(now: Date) {
-    const channels = await slack.list();
-    const rows = channels.map((c) => ({
-      id: c.id,
-      name: c.name,
-      kind: c.is_private ? "private" : "public",
-      is_member: c.is_member,
-    }));
+  /** 수집 대상 채널만 하나씩 조회한다. 보이지 않는 채널은 lost로 둔다. */
+  async function discover(allowed: string[], now: Date) {
+    const rows = [];
+    for (const id of allowed) {
+      try {
+        const c = await slack.info(id);
+        rows.push({
+          id: c.id,
+          name: c.name,
+          kind: c.is_private ? "private" : "public",
+          is_member: c.is_member,
+        });
+      } catch (e) {
+        if (!(e instanceof SlackError && LOST.has(e.code))) throw e;
+        await db.query(SQL.markLost, [id, now]);
+      }
+    }
     await db.query(SQL.upsertChannels, [JSON.stringify(rows)]);
-    await db.query(SQL.markMissingLost, [channels.map((c) => c.id), now]);
   }
 
   return {
@@ -112,7 +120,7 @@ export function createCollector(db: Db, slack: Slack, config: Config): { tick(no
       try {
         if (allowed.length > 0) {
           if (due("discover", 6 * HOUR, now)) {
-            await discover(now);
+            await discover(allowed, now);
             lastRun.set("discover", now.getTime());
           }
           const weekly = due("weekly", 7 * DAY, now);

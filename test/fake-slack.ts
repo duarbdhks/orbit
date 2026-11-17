@@ -49,7 +49,8 @@ export async function startFakeSlack(pageSize = 3) {
     return {
       items: items.slice(start, end),
       has_more: next !== "",
-      response_metadata: { next_cursor: next },
+      // 실제 Slack은 마지막 페이지에서 next_cursor 없이 warnings만 줄 때가 있다.
+      response_metadata: next ? { next_cursor: next } : { warnings: ["superfluous_charset"] },
     };
   }
 
@@ -66,9 +67,9 @@ export async function startFakeSlack(pageSize = 3) {
     if (error) return { ok: false, error };
     const own = messages.filter((m) => m.channel === channel).sort((a, b) => Number(a.ts) - Number(b.ts));
     switch (method) {
-      case "conversations.list": {
-        const { items, response_metadata } = page(channels, p);
-        return { ok: true, channels: items, response_metadata };
+      case "conversations.info": {
+        const found = channels.find((c) => c.id === channel);
+        return found ? { ok: true, channel: found } : { ok: false, error: "channel_not_found" };
       }
       case "conversations.history": {
         const inclusive = p.get("inclusive") === "true";

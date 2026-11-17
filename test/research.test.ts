@@ -113,6 +113,23 @@ test("advise 는 모델 전송이 허용된 채널에만 쓰고 바꾼 결과는
   await db.end();
 });
 
+test("분류하는 사이 지워진 메시지는 건너뛰고 나머지를 계속 분류한다", async () => {
+  const { db } = await testDb();
+  await seed(db, { id: "CSAMPLE9", sample: true }, [
+    ["1794787200.000100", "배포 일정은 금요일 오후입니다"],
+    ["1794787260.000100", "회의는 3시입니다"],
+  ]);
+  await classifyPass(db, config(), {
+    advise: async (_message, rules) => {
+      await db.query("DELETE FROM messages WHERE ts = '1794787200.000100'");
+      return rules;
+    },
+  });
+  const rows = await db.query("SELECT ts FROM classifications");
+  assert.deepEqual(rows.rows, [{ ts: "1794787260.000100" }]);
+  await db.end();
+});
+
 test("webhook 은 본문 HMAC 서명을 붙이고 실패한 알림은 다음 pass 가 다시 보낸다", async () => {
   const { db } = await testDb();
   await seed(db, { id: "C1", sample: false }, [["1794787200.000100", "결제 서버 장애로 주문이 실패합니다"]]);
