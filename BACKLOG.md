@@ -24,6 +24,7 @@ v1에서 일부러 하지 않은 것과, 꺼내는 조건이다.
 
 ## 운영
 
+- 조직 모델 자격. cron, webhook, 서브에이전트 턴은 개인 Codex 구독을 쓰지 못한다. API 키(유료)나 sandbox를 켠 뒤의 `CODEX_AUTH_CREDENTIAL` 중 하나를 정해야 분석 cron과 긴급 알림 요약이 돈다. 그때까지 cron 3개는 꺼 둔다.
 - core의 arm64 빌드. AI 턴이 150초를 넘으면 꺼낸다. 지금 이미지는 amd64 에뮬레이션으로 돈다.
 - QM API 포트 18080의 localhost 바인딩. Docker Desktop 전역 설정이라 사용자 승인이 필요하다.
 - iwinv Linux 서버 이전. `scripts/mac/`만 systemd 유닛으로 바꾸면 된다.
