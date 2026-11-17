@@ -68,7 +68,7 @@ esac
     join(dir, "config/qm/deployments/orbit/state.json"),
     JSON.stringify({ pgPassword: "test-password" }),
   );
-  return { dir, home, calls, env };
+  return { dir, bin, home, calls, env };
 }
 
 test("QM 환경은 원래 계약의 별칭을 보존하고 셸의 모델 키를 가져오지 않는다", (t) => {
@@ -97,12 +97,14 @@ test("QM 환경은 원래 계약의 별칭을 보존하고 셸의 모델 키를 
 
 test("기존 볼륨이 없으면 QM 환경 준비가 빈 DB를 만들지 않는다", (t) => {
   const s = sandbox(t);
-  const run = spawnSync(process.execPath, ["scripts/qm_env.mjs", join(s.dir, "runtime")], {
-    env: { ...s.env, VOLUMES: "missing" },
-    encoding: "utf8",
-  });
-  assert.notEqual(run.status, 0);
-  assert.match(run.stderr, /기존 데이터 볼륨 또는 QM DB 비밀번호/);
+  for (const args of [[], ["--init"]]) {
+    const run = spawnSync(process.execPath, ["scripts/qm_env.mjs", join(s.dir, "runtime"), ...args], {
+      env: { ...s.env, VOLUMES: "missing" },
+      encoding: "utf8",
+    });
+    assert.notEqual(run.status, 0);
+    assert.match(run.stderr, /기존 데이터 볼륨 또는 QM DB 비밀번호/);
+  }
   assert.doesNotMatch(readFileSync(s.calls, "utf8"), /volume create/);
 });
 
@@ -165,3 +167,91 @@ test("QM down --purge는 볼륨이나 컨테이너에 접근하지 않고 거절
   const run = spawnSync("bash", [resolve("scripts/qm.sh"), "down", "--purge"], { encoding: "utf8" });
   assert.equal(run.status, 2);
 });
+
+function deployment(t: TestContext) {
+  const s = sandbox(t);
+  const archive = join(s.dir, "archive");
+  mkdirSync(join(archive, "scripts"), { recursive: true });
+  writeFileSync(join(archive, "Dockerfile"), "FROM fixture\n");
+  writeFileSync(join(archive, "compose.yaml"), "services: {}\n");
+  writeFileSync(
+    join(archive, "scripts/compose.sh"),
+    `#!/bin/bash
+echo "new-compose $*" >> "$CALLS"
+case "$*" in
+  'up '*orbit-pg*) exit 0 ;;
+  'up '*) exit 1 ;;
+esac
+`,
+    { mode: 0o755 },
+  );
+  const old = join(s.home, "releases/deployed");
+  mkdirSync(join(old, "scripts"), { recursive: true });
+  writeFileSync(join(old, "compose.yaml"), "services: {}\n");
+  writeFileSync(
+    join(old, "scripts/qm.sh"),
+    `#!/bin/bash
+[ -z "$OPENROUTER_API_KEY" ] || exit 9
+echo restored > "$ORBIT_HOME/restored"
+`,
+    { mode: 0o755 },
+  );
+  writeFileSync(
+    join(s.bin, "git"),
+    `#!/bin/bash
+case "$*" in
+  *'rev-parse '*) echo candidate ;;
+  *'archive '*) /usr/bin/tar -cf - -C "$ARCHIVE" . ;;
+esac
+`,
+    { mode: 0o755 },
+  );
+  writeFileSync(join(s.bin, "gh"), "#!/bin/bash\necho success\n", { mode: 0o755 });
+  writeFileSync(join(s.bin, "sleep"), "#!/bin/bash\nexit 0\n", { mode: 0o755 });
+  writeFileSync(
+    join(s.bin, "docker"),
+    `#!/bin/bash
+echo "$*" >> "$CALLS"
+case "$*" in
+  'ps -q '*) [ -f "$ORBIT_HOME/stopped" ] || echo running ;;
+  'build '*) [ "\${STOP_ON_BUILD:-}" != true ] || touch "$ORBIT_HOME/stopped" ;;
+  'inspect '*) echo unchanged ;;
+  'compose '*"ps -q"*) [[ "$*" = *--status* ]] || echo old-api ;;
+  'exec qm-orbit-core node '*) [ "\${QM_HEALTH:-ok}" = ok ] ;;
+esac
+`,
+    { mode: 0o755 },
+  );
+  return { ...s, env: { ...s.env, ARCHIVE: archive, OPENROUTER_API_KEY: "do-not-inherit" } };
+}
+
+test("빌드 중 그룹을 중지하면 자동 배포가 컨테이너 기동 전에 보류된다", (t) => {
+  const s = deployment(t);
+  const run = spawnSync("bash", ["scripts/deploy.sh", "--auto"], {
+    env: { ...s.env, STOP_ON_BUILD: "true" },
+    encoding: "utf8",
+  });
+  assert.equal(run.status, 0, run.stderr);
+  const calls = readFileSync(s.calls, "utf8");
+  assert.match(calls, /^build /m);
+  assert.doesNotMatch(calls, /^new-compose up /m);
+  assert.equal(readFileSync(join(s.home, "state/current"), "utf8"), "deployed\n");
+});
+
+for (const health of ["ok", "failed"]) {
+  test(`첫 Compose 교체 실패 시 기존 QM을 복원하고 헬스를 확인한다 ${health}`, (t) => {
+    const s = deployment(t);
+    const run = spawnSync("bash", ["scripts/deploy.sh"], {
+      env: { ...s.env, QM_HEALTH: health },
+      encoding: "utf8",
+    });
+    assert.equal(run.status, health === "ok" ? 1 : 2, run.stderr);
+    assert.equal(readFileSync(join(s.home, "restored"), "utf8"), "restored\n");
+    assert.match(readFileSync(s.calls, "utf8"), /exec qm-orbit-core node/);
+    assert.match(
+      readFileSync(join(s.home, "state/log"), "utf8"),
+      health === "ok" ? /rolled-back/ : /rollback-failed/,
+    );
+    assert.equal(readFileSync(join(s.home, "state/current"), "utf8"), "deployed\n");
+  });
+}

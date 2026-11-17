@@ -18,6 +18,7 @@ const { config } = loadConfigAt(fileURLToPath(new URL("../qm/qm.config.jsonc", i
 const secrets = readEnvFile(join(orbitHome, "env/qm.env"));
 const lookup = (name) => secrets.get(name)?.trim() ? secrets.get(name) : undefined;
 const statePath = join(process.env.XDG_CONFIG_HOME ?? join(homedir(), ".config"), "qm/deployments/orbit/state.json");
+const existingState = existsSync(statePath);
 const docker = (...args) => execFileSync("docker", args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 const volumeExists = (name) => {
   try { docker("volume", "inspect", name); return true; } catch { return false; }
@@ -25,7 +26,7 @@ const volumeExists = (name) => {
 
 try {
   let state = {};
-  if (existsSync(statePath)) {
+  if (existingState) {
     try { state = JSON.parse(readFileSync(statePath, "utf8")); }
     catch { throw new Error("QM 상태 파일을 읽을 수 없습니다. 백업을 확인하세요."); }
   }
@@ -44,7 +45,7 @@ try {
     mkdirSync(resolve(statePath, ".."), { recursive: true, mode: 0o700 });
     writeFileSync(statePath, JSON.stringify({ orgId: "orbit", network: "qm-orbit", pgPassword: password }), { mode: 0o600 });
   }
-  if (!password || (present.some(Boolean) && !present.every(Boolean)) || (!initialize && !present.every(Boolean))) {
+  if (!password || (existingState && !present.some(Boolean)) || (present.some(Boolean) && !present.every(Boolean)) || (!initialize && !present.every(Boolean))) {
     throw new Error("기존 데이터 볼륨 또는 QM DB 비밀번호가 없습니다. 백업과 QM 상태를 확인하세요.");
   }
   const core = {
