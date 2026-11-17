@@ -21,7 +21,7 @@ export type SlackChannel = z.infer<typeof Channel>;
 export type SlackMessage = z.infer<typeof Message>;
 
 const Ok = z.object({ ok: z.boolean(), error: z.string().optional() });
-const Cursor = z.object({ next_cursor: z.string() }).optional();
+const Cursor = z.object({ next_cursor: z.string().optional() }).optional();
 const ChannelInfo = z.object({ channel: Channel }).transform((b) => b.channel);
 const Messages = z
   .object({ messages: z.array(Message), response_metadata: Cursor })

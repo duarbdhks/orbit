@@ -49,7 +49,8 @@ export async function startFakeSlack(pageSize = 3) {
     return {
       items: items.slice(start, end),
       has_more: next !== "",
-      response_metadata: { next_cursor: next },
+      // 실제 Slack은 마지막 페이지에서 next_cursor 없이 warnings만 줄 때가 있다.
+      response_metadata: next ? { next_cursor: next } : { warnings: ["superfluous_charset"] },
     };
   }
 
