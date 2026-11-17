@@ -14,11 +14,12 @@ export type ModelMessage =
     }
   | { channel_id: string; ts: string; permalink: string; redacted: true };
 
-/** 샘플 채널은 항상, 실제 채널은 실데이터 분석이 켜져 있고 채널 id 를 명시했을 때만 모델로 보낸다. */
+/** 샘플 채널은 항상, 실제 채널은 실데이터 분석이 켜져 있고 채널 id 나 `*`(전체)를 명시했을 때만 모델로 보낸다. */
 export function modelAllowed(channel: { id: string; is_sample: boolean }, config: Config): boolean {
+  const allowed = config.ORBIT_ANALYZE_CHANNELS;
   return (
     channel.is_sample ||
-    (config.ORBIT_ANALYZE_REAL_DATA && config.ORBIT_ANALYZE_CHANNELS.includes(channel.id))
+    (config.ORBIT_ANALYZE_REAL_DATA && (allowed.includes("*") || allowed.includes(channel.id)))
   );
 }
 

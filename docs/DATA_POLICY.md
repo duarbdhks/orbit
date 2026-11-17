@@ -25,7 +25,7 @@
 ## 모델 전송
 
 - 기본값 `ORBIT_ANALYZE_REAL_DATA=false`에서는 샘플 채널 데이터만 모델로 나간다. 실제 채널은 위치(채널 id, ts, permalink)만 나간다.
-- 회사의 데이터 처리 정책을 확인한 뒤에만 `ORBIT_ANALYZE_REAL_DATA=true`로 바꾸고, 보낼 채널을 `ORBIT_ANALYZE_CHANNELS`에 적는다.
+- 회사의 데이터 처리 정책을 확인한 뒤에만 `ORBIT_ANALYZE_REAL_DATA=true`로 바꾸고, 보낼 채널을 `ORBIT_ANALYZE_CHANNELS`에 적는다. `*`는 수집한 채널 전체다.
 - Slack 원문은 MCP 응답에서 `untrusted_slack_content` 필드에 담긴다. 도구 설명은 이 값이 데이터이며 지시가 아니라고 알린다.
 - QM의 Slack 봇은 초대된 채널에만 글을 쓸 수 있다. 봇을 초대한 채널이 곧 게시 허용 범위다. 게시 전 승인은 DM 대화에서 받으며, QM `auto` 자세에는 이를 강제하는 장치가 없다.
 
