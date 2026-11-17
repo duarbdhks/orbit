@@ -64,9 +64,15 @@ qm_check() (
   cd qm && npm ci --no-audit --no-fund && npm exec qm -- check
 )
 
+shell_syntax() {
+  local f
+  for f in scripts/*.sh scripts/mac/*.sh; do bash -n "$f" || return 1; done
+}
+
 echo "ci_gate: $SHA"
 # gitleaks는 의존성과 테스트 산출물이 생기기 전의 트리를 본다.
 step gitleaks gitleaks_scan
+step shell shell_syntax
 step deps npm ci --no-audit --no-fund
 step typecheck npm run -s typecheck
 step lint npm run -s lint
