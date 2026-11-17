@@ -34,7 +34,7 @@ PUBLIC_API_URL=http://localhost:18080
 
 1. **Codex 구독 연결.** `scripts/qm.sh admin-login`이 출력한 링크로 `http://localhost:18082`에 로그인한다. 설정의 AI 계정에서 ChatGPT를 device 로그인으로 연결한다.
 2. **QM 봇 Slack 앱.** `scripts/qm.sh outputs`가 출력한 매니페스트 생성 링크로 앱을 만들고 설치한다. `connections:write` 앱 토큰을 만들고, 봇 토큰과 함께 관리자 화면의 Slack 카드에 넣는다. 봇을 테스트 채널 하나에 초대한다.
-3. **수집용 Slack 앱(Orbit Collector).** User scope `channels:read`, `channels:history`, `groups:read`, `groups:history`, `users:read`만 가진 앱을 따로 만들어 설치한다. User OAuth 토큰을 `env/collector.env`의 `SLACK_USER_TOKEN`에, 수집할 채널 id를 `ORBIT_COLLECT_CHANNELS`에 넣는다. `scripts/probe/slack.sh`로 보이는 채널 수를 확인한다.
+3. **수집용 Slack 앱(Orbit Collector).** `qm/collector-app-manifest.yml`로 앱을 따로 만들어 설치한다. User scope는 `channels:read`, `channels:history`, `groups:read`, `groups:history`, `users:read`뿐이다. User OAuth 토큰을 `env/collector.env`의 `SLACK_USER_TOKEN`에, 수집할 채널 id를 `ORBIT_COLLECT_CHANNELS`에 넣는다. `scripts/probe/slack.sh`로 보이는 채널 수를 확인한다.
 4. **주인 식별값.** `env/orbit.env`의 `ORBIT_OWNER_USER_ID`에 본인 Slack user id를 넣는다. `ORBIT_OWNER_PRINCIPAL`은 QM이 DM 턴에서 쓰는 본인 principal이다. 웹 로그인만 쓰면 이메일이고, Slack을 연결하면 달라질 수 있다. Orbit 도구 호출이 401이면 이 값을 QM이 보내는 값으로 맞춘다.
 
 env 파일을 바꾼 뒤에는 컨테이너를 다시 만든다.
