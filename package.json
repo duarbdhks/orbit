@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "biome check .",
     "format": "biome check --write .",
-    "test": "node test/run.ts"
+    "test": "node test/run.ts",
+    "eval:router": "node scripts/eval_router.ts"
   },
   "dependencies": {
     "fastify": "5.12.8",

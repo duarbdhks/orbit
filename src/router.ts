@@ -5,6 +5,7 @@ import type { Config } from "./config.ts";
 import { SQL } from "./db/router.ts";
 import type { Db } from "./db.ts";
 import { confident, type createJev, type JevQuestions, type JevResult } from "./jev.ts";
+import { modelAllowed } from "./policy.ts";
 import type { Classification, Message, Route } from "./types.ts";
 
 type Tier = "simple" | "standard" | "complex";
@@ -165,10 +166,9 @@ export function createAdvise(
     const mode = config.ORBIT_ROUTER_MODE;
     if (mode === "off") return rules;
     const start = performance.now();
-    // shortcut: research 의 modelAllowed/forModel 을 아직 쓸 수 없어 같은 기준을 보수적으로 옮겼다, 통합 때 그것으로 바꾼다.
-    const allowed =
-      (config.ORBIT_ANALYZE_REAL_DATA && config.ORBIT_ANALYZE_CHANNELS.includes(message.channel_id)) ||
-      (await db.query(SQL.channelIsSample, [message.channel_id])).rows[0]?.is_sample === true;
+    // 본문이 OpenRouter 로 나가는 지점이라 호출자와 따로 여기서도 전송 허용 여부를 본다.
+    const is_sample = (await db.query(SQL.channelIsSample, [message.channel_id])).rows[0]?.is_sample === true;
+    const allowed = modelAllowed({ id: message.channel_id, is_sample }, config);
     const asked = allowed
       ? await jev.decide({ channel_id: message.channel_id, text: message.text }, ROUTE_QUESTION)
       : null;

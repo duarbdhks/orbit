@@ -2,7 +2,9 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { createCollector } from "./collector.ts";
 import { loadConfig } from "./config.ts";
 import { connect, migrate, pendingMigrations, selfcheck } from "./db.ts";
+import { createJev } from "./jev.ts";
 import { classifyPass } from "./research.ts";
+import { createAdvise } from "./router.ts";
 import { loadSample } from "./sample.ts";
 import { buildServer } from "./server.ts";
 import { createSlack, SlackError } from "./slack.ts";
@@ -23,16 +25,19 @@ switch (command) {
     await selfcheck(db, statements);
     await db.end();
     break;
-  case "api":
-    await buildServer(db, config).listen({ host: "0.0.0.0", port: config.PORT });
+  case "api": {
+    const jev = createJev(db, config);
+    const advise = createAdvise(db, config, jev);
+    await buildServer(db, config, jev).listen({ host: "0.0.0.0", port: config.PORT });
     for (;;) {
       try {
-        await classifyPass(db, config);
+        await classifyPass(db, config, { advise });
       } catch (e) {
         console.error(`classify pass 실패: ${(e as { code?: string }).code ?? (e as Error).name}`);
       }
       await sleep(30_000);
     }
+  }
   case "sample":
     await loadSample(db);
     await db.end();

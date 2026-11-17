@@ -5,7 +5,7 @@ import type { FastifyInstance } from "fastify";
 import { loadConfig } from "../src/config.ts";
 import type { Db } from "../src/db.ts";
 import { createJev } from "../src/jev.ts";
-import { createAdvise, registerDecisions, tierOf } from "../src/router.ts";
+import { createAdvise, tierOf } from "../src/router.ts";
 import { buildServer } from "../src/server.ts";
 import type { Classification, Message } from "../src/types.ts";
 import { testDb } from "./helpers.ts";
@@ -41,8 +41,7 @@ async function setup(env: Record<string, string>, respond: () => Response = () =
     return respond();
   }) as typeof fetch;
   const jev = createJev(db, config, fetchImpl);
-  const app = buildServer(db);
-  registerDecisions(app, db, config, jev);
+  const app = buildServer(db, config, jev);
   return { db, app, sent, advise: createAdvise(db, config, jev) };
 }
 
