@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 비공개 저장소 CI용 셀프호스트 러너를 Mac의 Docker 컨테이너로 관리한다.
+# CI용 셀프호스트 러너를 Mac의 Docker 컨테이너로 관리한다.
 # 사용법: scripts/ci_runner.sh up|down|status
 # PR 코드가 이 컨테이너에서 실행되므로 호스트 폴더, ~/.ssh, docker.sock을 마운트하지 않는다.
 # shortcut: 컨테이너를 작업 사이에 재사용한다, 외부 기여자가 생기면 작업마다 새 컨테이너(ephemeral)로 바꾼다.
@@ -10,8 +10,13 @@ LABEL=orbit-ci-mac
 # actions-runner, Ubuntu 24.04 arm64. ZUSIK 러너와 같은 이미지다.
 IMAGE=ghcr.io/actions/actions-runner@sha256:759a1d94a15b05941aba5196974ff43fe15b4cbba29b694b35cbc32a1166b232
 REPO="$(git remote get-url origin | sed -E 's#^(git@github\.com:|https://github\.com/)##; s#\.git$##')"
+
 # 공개 저장소에 셀프호스트 러너를 붙이면 외부 PR 코드가 이 Mac에서 실행될 수 있다.
-[ "$(gh api "repos/$REPO" --jq .private)" = true ] || { echo "ci_runner: $REPO 는 비공개 저장소가 아닙니다." >&2; exit 2; }
+# 비공개이거나, 모든 외부 기여자의 포크 PR 실행에 승인이 필요할 때만 러너를 켠다.
+guarded() {
+  [ "$(gh api "repos/$REPO" --jq .private)" = true ] ||
+    [ "$(gh api "repos/$REPO/actions/permissions/fork-pr-contributor-approval" --jq .approval_policy)" = all_external_contributors ]
+}
 
 runner_id() {
   gh api "repos/$REPO/actions/runners" --jq ".runners[] | select(.name == \"$LABEL\") | .id"
@@ -19,6 +24,7 @@ runner_id() {
 
 case "${1:-}" in
   up)
+    guarded || { echo "ci_runner: $REPO 는 공개 저장소인데 포크 PR 승인 정책이 all_external_contributors 가 아닙니다." >&2; exit 2; }
     if docker container inspect "$NAME" >/dev/null 2>&1; then
       docker start "$NAME" >/dev/null
     else
