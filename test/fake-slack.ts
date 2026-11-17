@@ -18,13 +18,26 @@ export async function startFakeSlack(pageSize = 3) {
   const channels: { id: string; name: string; is_private: boolean; is_member: boolean }[] = [];
   const messages: Stored[] = [];
   const users = new Map([["U1", "alice"]]);
+  const people: {
+    id: string;
+    name: string;
+    real_name?: string;
+    profile?: { display_name?: string };
+    deleted?: boolean;
+    is_bot?: boolean;
+  }[] = [];
   const fake = {
     url: "",
     channels,
     messages,
+    people,
+    tokenOwner: "U1",
+    directs: [] as { id: string; user: string; is_im: boolean; is_mpim?: boolean }[],
+    responses: new Map<string, object>(),
     errors: new Map<string, string>(),
     rateLimit: 0,
     requests: [] as string[],
+    calls: [] as { method: string; params: URLSearchParams }[],
     add: (channel: string, message: FakeMessage) => {
       messages.push({ channel, ...message });
     },
@@ -62,11 +75,23 @@ export async function startFakeSlack(pageSize = 3) {
   }
 
   function handle(method: string, p: URLSearchParams): object {
+    const override = fake.responses.get(method);
+    if (override) return override;
     const channel = p.get("channel") ?? "";
-    const error = fake.errors.get(channel);
+    const error = fake.errors.get(channel) ?? fake.errors.get(method);
     if (error) return { ok: false, error };
     const own = messages.filter((m) => m.channel === channel).sort((a, b) => Number(a.ts) - Number(b.ts));
     switch (method) {
+      case "auth.test":
+        return { ok: true, user_id: fake.tokenOwner };
+      case "users.list": {
+        const { items, response_metadata } = page(people, p);
+        return { ok: true, members: items, response_metadata };
+      }
+      case "users.conversations": {
+        const { items, has_more, response_metadata } = page(fake.directs, p);
+        return { ok: true, channels: items, has_more, response_metadata };
+      }
       case "conversations.info": {
         const found = channels.find((c) => c.id === channel);
         return found ? { ok: true, channel: found } : { ok: false, error: "channel_not_found" };
@@ -85,7 +110,14 @@ export async function startFakeSlack(pageSize = 3) {
         return { ok: true, messages: items, has_more, response_metadata };
       }
       case "conversations.replies": {
-        const thread = own.filter((m) => m.ts === p.get("ts") || m.thread_ts === p.get("ts"));
+        const thread = own.filter((m) => {
+          if (m.ts !== p.get("ts") && m.thread_ts !== p.get("ts")) return false;
+          if (!p.has("oldest") && !p.has("latest")) return true;
+          const ts = Number(m.ts);
+          return (
+            ts >= Number(p.get("oldest") ?? 0) && ts <= Number(p.get("latest") ?? Number.POSITIVE_INFINITY)
+          );
+        });
         if (thread.length === 0) return { ok: false, error: "thread_not_found" };
         const { items, has_more, response_metadata } = page(thread.map(view), p);
         return { ok: true, messages: items, has_more, response_metadata };
@@ -107,6 +139,7 @@ export async function startFakeSlack(pageSize = 3) {
     for await (const chunk of req) body += chunk;
     const method = (req.url ?? "").slice(1);
     fake.requests.push(method);
+    fake.calls.push({ method, params: new URLSearchParams(body) });
     if (fake.rateLimit > 0) {
       fake.rateLimit--;
       res.writeHead(429, { "retry-after": "0" }).end();

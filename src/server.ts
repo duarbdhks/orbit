@@ -15,3 +15,9 @@ export function buildServer(db: Db, config: Config, jev = createJev(db, config))
   registerDecisions(app, db, config, jev);
   return app;
 }
+
+export function buildDecisionServer(db: Db, config: Config, jev = createJev(db, config)): FastifyInstance {
+  const app = Fastify();
+  registerDecisions(app, db, config, jev);
+  return app;
+}

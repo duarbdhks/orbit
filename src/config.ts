@@ -18,9 +18,11 @@ const list = z
 const Env = z.object({
   DATABASE_URL: z.string().min(1),
   PORT: z.coerce.number().int().default(8787),
+  ORBIT_DECISION_PORT: z.coerce.number().int().min(0).max(65535).default(0),
   ORBIT_API_TOKEN: z.string().default(""),
   ORBIT_OWNER_PRINCIPAL: z.string().default(""),
   ORBIT_OWNER_USER_ID: z.string().default(""),
+  ORBIT_COLLECTOR_URL: z.url({ protocol: /^https?$/ }).default("http://orbit-collector:8788"),
   SLACK_USER_TOKEN: z.string().default(""),
   SLACK_API_BASE: z.string().default("https://slack.com/api"),
   ORBIT_SLACK_BASE_URL: z.string().default("https://slack.com"),

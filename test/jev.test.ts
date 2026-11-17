@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { setTimeout as sleep } from "node:timers/promises";
 import { loadConfig } from "../src/config.ts";
 import { SQL } from "../src/db/router.ts";
 import { type Db, selfcheck } from "../src/db.ts";
@@ -140,6 +141,25 @@ test("네트워크 오류는 null 이고 사용량에 세지 않는다", async (
   assert.equal(fake.calls.length, 1);
   assert.deepEqual(await usage(db), []);
   await db.end();
+});
+
+test("Jev 는 QM 의 5초 제한 전에 중단하고 타임아웃을 규칙 대체용 null 로 돌려준다", {
+  timeout: 4_500,
+}, async () => {
+  const { db } = await testDb();
+  let calls = 0;
+  const stalled = (async (_url: string | URL | Request, init?: RequestInit) => {
+    calls++;
+    await sleep(5_000, undefined, { signal: init?.signal ?? undefined });
+    return Response.json(jevBody(GOOD));
+  }) as typeof fetch;
+  try {
+    assert.equal(await createJev(db, loadConfig(ON), stalled).decide({}, QUESTIONS, NOW), null);
+    assert.equal(calls, 1);
+    assert.deepEqual(await usage(db), []);
+  } finally {
+    await db.end();
+  }
 });
 
 test("confident 는 1위 0.6 이상이고 2위와 0.2 이상 차이 날 때만 참이다", () => {
