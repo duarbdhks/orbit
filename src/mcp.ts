@@ -60,14 +60,15 @@ function tool<T extends z.ZodType>(
 }
 
 function authorized(req: FastifyRequest, config: Config): boolean {
-  if (!config.ORBIT_API_TOKEN || !config.ORBIT_OWNER_PRINCIPAL) return false;
+  if (!config.ORBIT_API_TOKEN) return false;
   // 길이가 달라도 비교 시간이 같도록 해시끼리 견준다.
   const digest = (value: string) => createHash("sha256").update(value).digest();
-  const token = timingSafeEqual(
-    digest(req.headers.authorization ?? ""),
-    digest(`Bearer ${config.ORBIT_API_TOKEN}`),
-  );
-  return token && req.headers["x-qm-actor"] === config.ORBIT_OWNER_PRINCIPAL;
+  return timingSafeEqual(digest(req.headers.authorization ?? ""), digest(`Bearer ${config.ORBIT_API_TOKEN}`));
+}
+
+// QM 은 도구 목록을 사람 없이 조회한다. 데이터를 돌려주는 tools/call 만 주인이 한 호출인지 본다.
+function ownerCall(req: FastifyRequest, config: Config): boolean {
+  return config.ORBIT_OWNER_PRINCIPAL !== "" && req.headers["x-qm-actor"] === config.ORBIT_OWNER_PRINCIPAL;
 }
 
 async function transaction<T>(db: Db, work: (client: pg.PoolClient) => Promise<T>): Promise<T> {
@@ -287,6 +288,8 @@ export function registerMcp(app: FastifyInstance, db: Db, config: Config): void 
         .send({ jsonrpc: "2.0", id: null, error: { code: -32600, message: "Invalid Request" } });
     }
     const { id, method, params } = msg.data;
+    if (method === "tools/call" && !ownerCall(req, config))
+      return reply.code(401).send({ error: "unauthorized" });
     if (id === undefined) return reply.code(202).send();
     return { jsonrpc: "2.0", id, ...(await answer(method, params ?? {})) };
   });

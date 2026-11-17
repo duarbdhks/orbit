@@ -81,8 +81,17 @@ test("토큰이 없거나 틀리거나 다른 actor 면 401 이고 설정이 비
     (await rpc(app, "ping", undefined, { ...AUTH, authorization: "Bearer wrong" })).statusCode,
     401,
   );
-  assert.equal((await rpc(app, "ping", undefined, { ...AUTH, "x-qm-actor": "intruder@qm" })).statusCode, 401);
-  assert.equal((await rpc(app, "ping")).statusCode, 200);
+  const status = { name: "collector_status", arguments: {} };
+  assert.equal(
+    (await rpc(app, "tools/call", status, { ...AUTH, "x-qm-actor": "intruder@qm" })).statusCode,
+    401,
+  );
+  assert.equal((await rpc(app, "tools/call", status)).statusCode, 200);
+  // 도구 목록은 데이터가 아니라서 토큰만으로 볼 수 있다.
+  assert.equal(
+    (await rpc(app, "tools/list", undefined, { authorization: AUTH.authorization })).statusCode,
+    200,
+  );
 
   const noToken = mcp(db, config({ ORBIT_API_TOKEN: "" }));
   assert.equal(
@@ -90,7 +99,7 @@ test("토큰이 없거나 틀리거나 다른 actor 면 401 이고 설정이 비
     401,
   );
   const noOwner = mcp(db, config({ ORBIT_OWNER_PRINCIPAL: "" }));
-  assert.equal((await rpc(noOwner, "ping", undefined, { ...AUTH, "x-qm-actor": "" })).statusCode, 401);
+  assert.equal((await rpc(noOwner, "tools/call", status, { ...AUTH, "x-qm-actor": "" })).statusCode, 401);
   await db.end();
 });
 

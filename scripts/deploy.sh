@@ -86,6 +86,8 @@ fail() {  # 이 커밋의 문제. 같은 커밋을 다시 올리지 않는다.
 }
 
 g fetch --quiet --prune origin 2>/dev/null || transient fetch
+# fetch 가 다시 되면 fetch 실패로 남긴 보류 기록을 지운다.
+if [ "$(cut -d' ' -f1 "$STATE/attempts" 2>/dev/null)" = fetch ]; then rm -f "$STATE/attempts" "$STATE/blocked"; fi
 SHA="$(g rev-parse --verify --quiet "$REF^{commit}")" || { echo "deploy: 커밋을 찾지 못했습니다: $REF" >&2; exit 2; }
 if [ "$SHA" = "$CUR" ] && [ "$FORCE" != 1 ]; then
   say "이미 배포된 커밋입니다: $SHA"
