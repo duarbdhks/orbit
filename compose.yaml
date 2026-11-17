@@ -1,0 +1,52 @@
+# Orbit 서비스. scripts/deploy.sh 가 ORBIT_IMAGE_TAG(커밋 SHA)와 env/orbit.env 로 실행한다.
+name: orbit
+
+services:
+  orbit-pg:
+    image: pgvector/pgvector:0.8.1-pg16@sha256:33198da2828a14c30348d2ccb4750833d5ed9a44c88d840a0e523d7417120337
+    container_name: orbit-pg
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: orbit
+      POSTGRES_DB: orbit
+      POSTGRES_PASSWORD: ${ORBIT_PG_PASSWORD:?}
+    volumes:
+      - orbit-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # 초기화 중인 임시 서버는 TCP를 열지 않는다. TCP로 물어야 준비가 끝난 뒤에만 통과한다.
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "orbit", "-d", "orbit"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  orbit-api:
+    image: orbit:${ORBIT_IMAGE_TAG:?}
+    container_name: orbit-api
+    restart: unless-stopped
+    command: ["node", "src/main.ts", "api"]
+    env_file: ["${ORBIT_HOME:?}/env/orbit.env"]
+    environment:
+      DATABASE_URL: postgres://orbit:${ORBIT_PG_PASSWORD}@orbit-pg:5432/orbit
+    depends_on:
+      orbit-pg:
+        condition: service_healthy
+    # QM core 가 http://orbit-api:8787 로 부른다. Postgres 는 QM 네트워크에 붙이지 않는다.
+    networks: [default, qm]
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch("http://127.0.0.1:8787/healthz").then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+networks:
+  qm:
+    name: qm-orbit
+    external: true
+
+volumes:
+  orbit-pgdata:
+    name: orbit-pgdata
